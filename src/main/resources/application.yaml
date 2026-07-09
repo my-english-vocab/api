@@ -20,6 +20,9 @@ spring:
     properties:
       hibernate:
         format_sql: true
+  web:
+    error:
+      include-message: always
 
 server:
   port: 8080
