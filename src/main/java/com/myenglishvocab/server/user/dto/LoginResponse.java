@@ -4,6 +4,7 @@ public record LoginResponse(
         Long userId,
         String username,
         String displayName,
-        String message
+        String accessToken,
+        String tokenType
 ) {
 }
