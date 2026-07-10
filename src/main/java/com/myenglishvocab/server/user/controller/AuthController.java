@@ -1,5 +1,7 @@
 package com.myenglishvocab.server.user.controller;
 
+import com.myenglishvocab.server.user.dto.LoginRequest;
+import com.myenglishvocab.server.user.dto.LoginResponse;
 import com.myenglishvocab.server.user.dto.SignupRequest;
 import com.myenglishvocab.server.user.dto.SignupResponse;
 import com.myenglishvocab.server.user.service.UserService;
@@ -22,5 +24,11 @@ public class AuthController {
     public ResponseEntity<SignupResponse> signup(@RequestBody SignupRequest request) {
         SignupResponse response = userService.signup(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
+        LoginResponse response = userService.login(request);
+        return ResponseEntity.ok(response);
     }
 }
