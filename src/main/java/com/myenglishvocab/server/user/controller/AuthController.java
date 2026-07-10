@@ -1,5 +1,6 @@
 package com.myenglishvocab.server.user.controller;
 
+import com.myenglishvocab.server.auth.jwt.JwtPrincipal;
 import com.myenglishvocab.server.user.dto.LoginRequest;
 import com.myenglishvocab.server.user.dto.LoginResponse;
 import com.myenglishvocab.server.user.dto.SignupRequest;
@@ -8,10 +9,8 @@ import com.myenglishvocab.server.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -30,5 +29,10 @@ public class AuthController {
     public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
         LoginResponse response = userService.login(request);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<JwtPrincipal> me(@AuthenticationPrincipal JwtPrincipal principal) {
+        return ResponseEntity.ok(principal);
     }
 }

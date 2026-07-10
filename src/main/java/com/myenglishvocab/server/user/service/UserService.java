@@ -1,5 +1,6 @@
 package com.myenglishvocab.server.user.service;
 
+import com.myenglishvocab.server.auth.jwt.JwtTokenProvider;
 import com.myenglishvocab.server.user.dto.LoginRequest;
 import com.myenglishvocab.server.user.dto.LoginResponse;
 import com.myenglishvocab.server.user.dto.SignupRequest;
@@ -19,6 +20,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtTokenProvider jwtTokenProvider;
 
     @Transactional
     public SignupResponse signup(SignupRequest request) {
@@ -49,6 +51,14 @@ public class UserService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다.");
         }
 
-        return new LoginResponse(user.getId(), user.getUsername(), user.getDisplayName(), "로그인 성공");
+        String accessToken = jwtTokenProvider.generateAccessToken(user.getId(), user.getUsername());
+
+        return new LoginResponse(
+                user.getId(),
+                user.getUsername(),
+                user.getDisplayName(),
+                accessToken,
+                "Bearer"
+        );
     }
 }
