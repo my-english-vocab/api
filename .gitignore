@@ -38,3 +38,8 @@ out/
 
 # H2 Database files
 *.db
+
+# Local secrets / overrides
+.env
+application-local.yaml
+application-local.yml
