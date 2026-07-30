@@ -9,15 +9,38 @@ JWT Access Token + Redis Refresh Token 인증, 사용자별 단어장 API, 표�
 - Spring Data Redis (Refresh Token 저장)
 - Spring Data JPA, H2
 - SpringDoc OpenAPI
+- Docker Compose (로컬 Redis)
 
 ## 로컬 실행
 
-### 1) Redis
-Refresh Token 저장소로 Redis가 필요합니다.
+Docker Desktop을 먼저 실행한 뒤, `server/` 디렉터리에서 아래를 진행하세요.
+
+### 1) Redis (Docker Compose)
+Refresh Token 저장소로 Redis가 필요합니다. Compose로 기동합니다.
 
 ```bash
-docker run -d --name vocab-redis -p 6379:6379 redis:7
+docker compose up -d
 ```
+
+상태 확인:
+
+```bash
+docker compose ps
+```
+
+종료 (컨테이너만 중지·삭제, 데이터 volume은 유지):
+
+```bash
+docker compose down
+```
+
+데이터 volume까지 삭제하려면:
+
+```bash
+docker compose down -v
+```
+
+> `docker-compose.yml`은 Redis만 포함합니다. 애플리케이션은 아래 `./gradlew bootRun`으로 실행합니다.
 
 ### 2) 환경변수
 ```bash
@@ -130,6 +153,7 @@ curl -X POST http://localhost:8080/api/words \
 
 ## 프로젝트 구조
 ```
+docker-compose.yml            # 로컬 Redis
 user/
   controller/AuthController
   service/UserService
