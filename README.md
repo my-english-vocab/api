@@ -1,7 +1,7 @@
 # MyEnglishVocab Server
 
 Spring Boot 기반 영어 단어장 API 서버입니다.  
-JWT Access Token + Redis Refresh Token 인증과 표준 에러 응답을 적용했습니다.
+JWT Access Token + Redis Refresh Token 인증, 사용자별 단어장 API, 표준 에러 응답을 적용했습니다.
 
 ## Tech Stack
 - Java 21, Spring Boot 4
@@ -70,6 +70,36 @@ refresh / logout은 body에 `refreshToken`을 넣습니다.
 | Access Token (JWT) | 30분 | 클라이언트 | API 인증 |
 | Refresh Token (UUID) | 7일 | Redis (`refresh:{token}` → userId) | Access 재발급 / 로그아웃 |
 
+## 단어장 API
+
+모든 Word API는 **JWT 인증 필수**입니다. URL에 userId를 넣지 않으며, JWT의 `userId`로 본인 단어만 접근합니다.
+
+| Method | Path | 설명 |
+|---|---|---|
+| `GET` | `/api/words` | 내 단어 목록 (저장 순서) |
+| `GET` | `/api/words/{id}` | 내 단어 단건 조회 |
+| `POST` | `/api/words` | 단어 추가 (level은 서버에서 0으로 시작) |
+| `PUT` | `/api/words/{id}` | 단어 내용 수정 (level 변경 불가) |
+| `DELETE` | `/api/words/{id}` | 단어 삭제 |
+| `POST` | `/api/words/{id}/mark-learned` | 외웠음 처리 (level + 1) |
+
+### 단어 생성 예시
+```bash
+curl -X POST http://localhost:8080/api/words \
+  -H "Authorization: Bearer {accessToken}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "term": "apple",
+    "definition": "사과",
+    "exampleSentence": "I like apples.",
+    "meaningOfExampleSentence": "나는 사과를 좋아한다."
+  }'
+```
+
+### 퀴즈와의 역할 분리
+- **서버**: 단어 목록 제공, `mark-learned`로 level 증가
+- **프론트**: 랜덤/순서대로 보여주기, 뜻 보기/넘기기 UI
+
 ## 에러 응답 형식
 ```json
 {
@@ -84,8 +114,10 @@ refresh / logout은 body에 `refreshToken`을 넣습니다.
 | code | HTTP | 설명 |
 |---|---|---|
 | `USER_DUPLICATE_USERNAME` | 409 | 중복 username |
+| `USER_NOT_FOUND` | 404 | 사용자 없음 |
 | `AUTH_INVALID_CREDENTIALS` | 401 | 로그인 실패 |
 | `AUTH_INVALID_REFRESH_TOKEN` | 401 | 유효하지 않은 refresh token |
+| `WORD_NOT_FOUND` | 404 | 단어 없음 또는 소유자 아님 |
 | `COMMON_INVALID_INPUT` | 400 | 입력값 검증 실패 |
 | `COMMON_INTERNAL_ERROR` | 500 | 서버 내부 오류 |
 
@@ -96,22 +128,27 @@ refresh / logout은 body에 `refreshToken`을 넣습니다.
 | `test` | 테스트, InMemory Refresh Token Store |
 | `prod` | 운영 (`ddl-auto: validate`, 에러 메시지 숨김) |
 
-## 프로젝트 구조 (인증)
+## 프로젝트 구조
 ```
 user/
-  controller/AuthController   # HTTP 엔드포인트
-  service/UserService         # 회원가입/로그인/refresh/logout
-  entity/User                 # JPA 엔티티
+  controller/AuthController
+  service/UserService
+  entity/User
+word/
+  controller/WordController
+  service/WordService
+  entity/Word
+  repository/WordRepository
 auth/jwt/
-  JwtTokenProvider            # Access Token 생성/검증
-  JwtAuthenticationFilter     # 요청마다 Bearer 토큰 검사
+  JwtTokenProvider
+  JwtAuthenticationFilter
 auth/token/
-  RefreshTokenStore           # Refresh 저장 포트
-  RedisRefreshTokenStore      # Redis 구현 (!test)
-  InMemoryRefreshTokenStore   # 테스트용 구현 (test)
+  RefreshTokenStore
+  RedisRefreshTokenStore
+  InMemoryRefreshTokenStore
 common/exception/
-  GlobalExceptionHandler      # 표준 에러 응답
+  GlobalExceptionHandler
 config/
-  SecurityConfig              # Spring Security 설정
-  OpenApiConfig               # Swagger 문서 설정
+  SecurityConfig
+  OpenApiConfig
 ```
