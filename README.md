@@ -10,6 +10,7 @@ JWT Access Token + Redis Refresh Token 인증, 사용자별 단어장 API, 표�
 - Spring Data JPA, H2
 - SpringDoc OpenAPI
 - Docker Compose (로컬 Redis)
+- GitHub Actions CI (PR/`main` push 시 `./gradlew test`)
 
 ## 로컬 실행
 
@@ -75,6 +76,16 @@ export REDIS_PORT=6379
 ```
 
 테스트 프로필(`test`)에서는 Redis 대신 인메모리 Refresh Token Store를 사용합니다.
+
+## CI
+
+GitHub Actions가 `main`에 대한 push와 pull request마다 테스트를 실행합니다.
+
+- 워크플로: `.github/workflows/ci.yml`
+- 실행 내용: JDK 21 설정 후 `./gradlew test --no-daemon`
+- Redis는 테스트 프로필에서 InMemory Store를 쓰므로 CI에 Redis가 필요하지 않습니다.
+
+PR 페이지의 **Checks / Actions** 탭에서 결과를 확인할 수 있습니다.
 
 ## 인증 흐름
 1. `POST /api/auth/signup` — 회원가입
@@ -153,6 +164,7 @@ curl -X POST http://localhost:8080/api/words \
 
 ## 프로젝트 구조
 ```
+.github/workflows/ci.yml      # GitHub Actions CI
 docker-compose.yml            # 로컬 Redis
 user/
   controller/AuthController
