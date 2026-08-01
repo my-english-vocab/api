@@ -8,6 +8,7 @@ JWT Access Token + Redis Refresh Token 인증, 사용자별 단어장 API, 표�
 - Spring Security + JWT (jjwt)
 - Spring Data Redis (Refresh Token 저장)
 - Spring Data JPA, H2
+- Flyway (DB 스키마 마이그레이션)
 - SpringDoc OpenAPI
 - Docker Compose (로컬 Redis)
 - GitHub Actions CI (PR/`main` push 시 `./gradlew test`)
@@ -87,6 +88,25 @@ GitHub Actions가 `main`에 대한 push와 pull request마다 테스트를 실�
 
 PR 페이지의 **Checks / Actions** 탭에서 결과를 확인할 수 있습니다.
 
+## DB 마이그레이션 (Flyway)
+
+스키마 변경은 Hibernate `ddl-auto`가 아니라 **Flyway SQL**로 관리합니다.
+
+- 마이그레이션 위치: `src/main/resources/db/migration/`
+  - `V1__create_users.sql` — users 테이블
+  - `V2__create_words.sql` — words 테이블
+- 앱 기동 시 Flyway가 아직 적용되지 않은 버전만 순서대로 실행합니다.
+- JPA `ddl-auto`는 `validate`입니다. (엔티티와 DB 스키마 일치만 검사)
+- 적용 이력은 H2의 `flyway_schema_history` 테이블에서 확인할 수 있습니다.
+
+로컬에서 스키마를 처음부터 다시 적용하려면 서버를 끈 뒤 H2 파일을 삭제하세요.
+
+```bash
+rm -f vocabdb.mv.db vocabdb.trace.db
+```
+
+그다음 앱을 다시 실행하면 V1, V2가 다시 적용됩니다. (로컬 데이터는 삭제됩니다.)
+
 ## 인증 흐름
 1. `POST /api/auth/signup` — 회원가입
 2. `POST /api/auth/login` — `accessToken` + `refreshToken` 발급
@@ -158,14 +178,17 @@ curl -X POST http://localhost:8080/api/words \
 ## Profiles
 | profile | 용도 |
 |---|---|
-| `local` | 로컬 개발 (기본값), Redis 사용 |
-| `test` | 테스트, InMemory Refresh Token Store |
+| `local` | 로컬 개발 (기본값), Redis + Flyway |
+| `test` | 테스트, InMemory Refresh Token Store, Flyway + `ddl-auto: validate` |
 | `prod` | 운영 (`ddl-auto: validate`, 에러 메시지 숨김) |
 
 ## 프로젝트 구조
 ```
 .github/workflows/ci.yml      # GitHub Actions CI
 docker-compose.yml            # 로컬 Redis
+src/main/resources/db/migration/
+  V1__create_users.sql
+  V2__create_words.sql
 user/
   controller/AuthController
   service/UserService
