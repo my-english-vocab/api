@@ -44,3 +44,14 @@ logging:
   level:
     com.myenglishvocab.server: INFO
     org.springframework.security: WARN
+
+ai:
+  provider: openai # openai or gemini
+  daily-limit: 10
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+    model: gpt-4o-mini
+  gemini:
+    api-key: ${GEMINI_API_KEY:}
+    model: gemini-2.5-flash
+    enabled: true

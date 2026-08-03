@@ -20,7 +20,7 @@ public class GlobalExceptionHandler {
         log.warn("BusinessException code={} path={}", errorCode.getCode(), request.getRequestURI());
         return ResponseEntity
                 .status(errorCode.getStatus())
-                .body(ErrorResponse.of(errorCode, request.getRequestURI()));
+                .body(ErrorResponse.of(errorCode, request.getRequestURI(), e.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

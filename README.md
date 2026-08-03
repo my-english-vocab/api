@@ -1,14 +1,15 @@
 # MyEnglishVocab Server
 
 Spring Boot 기반 영어 단어장 API 서버입니다.  
-JWT Access Token + Redis Refresh Token 인증, 사용자별 단어장 API, 표준 에러 응답을 적용했습니다.
+JWT Access Token + Redis Refresh Token 인증, 사용자별 단어장 API, AI 예문 생성, 표준 에러 응답을 적용했습니다.
 
 ## Tech Stack
 - Java 21, Spring Boot 4
 - Spring Security + JWT (jjwt)
-- Spring Data Redis (Refresh Token 저장)
+- Spring Data Redis (Refresh Token · AI 일일 사용량)
 - Spring Data JPA, H2
 - Flyway (DB 스키마 마이그레이션)
+- OpenAI / Gemini (예문·뜻 생성, provider 전환 가능)
 - SpringDoc OpenAPI
 - Docker Compose (로컬 Redis)
 - GitHub Actions CI (PR/`main` push 시 `./gradlew test`)
@@ -18,7 +19,7 @@ JWT Access Token + Redis Refresh Token 인증, 사용자별 단어장 API, 표�
 Docker Desktop을 먼저 실행한 뒤, `server/` 디렉터리에서 아래를 진행하세요.
 
 ### 1) Redis (Docker Compose)
-Refresh Token 저장소로 Redis가 필요합니다. Compose로 기동합니다.
+Refresh Token과 AI 일일 사용량 카운트에 Redis가 필요합니다. Compose로 기동합니다.
 
 ```bash
 docker compose up -d
@@ -49,14 +50,23 @@ docker compose down -v
 cp .env.example .env
 ```
 
-`.env`에서 `JWT_SECRET`을 32자 이상으로 설정하세요.  
+`.env`에서 아래를 설정하세요.  
 또는 `application-local.yaml`(gitignore)을 사용해도 됩니다.
+
+| 변수 | 필수 | 설명 |
+|---|---|---|
+| `JWT_SECRET` | 예 | 최소 32자 |
+| `SPRING_PROFILES_ACTIVE` | 아니오 | 기본 `local` |
+| `REDIS_HOST` / `REDIS_PORT` | 아니오 | 기본 `localhost` / `6379` |
+| `OPENAI_API_KEY` | AI 사용 시 (기본 provider) | OpenAI API 키 |
+| `GEMINI_API_KEY` | `ai.provider=gemini`일 때 | Gemini API 키 |
 
 ```bash
 export JWT_SECRET=local-dev-secret-key-must-be-at-least-32-characters-long
 export SPRING_PROFILES_ACTIVE=local
 export REDIS_HOST=localhost
 export REDIS_PORT=6379
+export OPENAI_API_KEY=sk-...
 ```
 
 ### 3) 서버 실행
@@ -76,7 +86,7 @@ export REDIS_PORT=6379
 ./gradlew test
 ```
 
-테스트 프로필(`test`)에서는 Redis 대신 인메모리 Refresh Token Store를 사용합니다.
+테스트 프로필(`test`)에서는 Redis 대신 인메모리 Refresh Token Store · AI 사용량 Limiter를 사용합니다.
 
 ## CI
 
@@ -136,6 +146,7 @@ refresh / logout은 body에 `refreshToken`을 넣습니다.
 | `PUT` | `/api/words/{id}` | 단어 내용 수정 (level 변경 불가) |
 | `DELETE` | `/api/words/{id}` | 단어 삭제 |
 | `POST` | `/api/words/{id}/mark-learned` | 외웠음 처리 (level + 1) |
+| `POST` | `/api/words/generate-example` | AI로 뜻·예문·해석 생성 (저장하지 않음) |
 
 ### 단어 생성 예시
 ```bash
@@ -153,6 +164,59 @@ curl -X POST http://localhost:8080/api/words \
 ### 퀴즈와의 역할 분리
 - **서버**: 단어 목록 제공, `mark-learned`로 level 증가
 - **프론트**: 랜덤/순서대로 보여주기, 뜻 보기/넘기기 UI
+
+## AI 예문 생성
+
+`POST /api/words/generate-example`은 JWT 인증이 필요합니다.  
+결과는 DB에 저장되지 않으므로, 확인 후 `POST /api/words`로 저장하세요.
+
+### 동작
+1. `term` 필수, `definition` 선택
+2. `definition`이 없으면 영어 단어를 짧은 한국어 뜻으로 번역
+3. 미국 일상 회화 느낌의 예문 + 한국어 해석 생성
+4. 계정당 하루 사용량 차감 (`ai.daily-limit`, 기본 10회, 한국 시간 기준)
+
+### Provider 전환
+`src/main/resources/application.yaml`의 `ai.provider`로 전환합니다. 변경 후 서버를 재시작하세요.
+
+```yaml
+ai:
+  provider: openai        # openai | gemini
+  daily-limit: 10
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+    model: gpt-4o-mini
+  gemini:
+    api-key: ${GEMINI_API_KEY:}
+    model: gemini-2.5-flash
+```
+
+| provider | 필요 키 | 구현 |
+|---|---|---|
+| `openai` (기본) | `OPENAI_API_KEY` | OpenAI Chat Completions |
+| `gemini` | `GEMINI_API_KEY` | Google Gemini generateContent |
+
+### 요청 / 응답 예시
+```bash
+curl -X POST http://localhost:8080/api/words/generate-example \
+  -H "Authorization: Bearer {accessToken}" \
+  -H "Content-Type: application/json" \
+  -d '{ "term": "apple" }'
+```
+
+```json
+{
+  "definition": "사과",
+  "exampleSentence": "I bought a fresh apple from the market.",
+  "meaningOfExampleSentence": "나는 시장에서 신선한 사과를 샀다."
+}
+```
+
+### Redis 키 (참고)
+| 키 | 값 | 설명 |
+|---|---|---|
+| `refresh:{uuid}` | userId | Refresh Token |
+| `ai:daily:{userId}:{yyyy-MM-dd}` | 사용 횟수 | AI 일일 한도 (당일 자정까지 TTL) |
 
 ## 에러 응답 형식
 ```json
@@ -172,6 +236,9 @@ curl -X POST http://localhost:8080/api/words \
 | `AUTH_INVALID_CREDENTIALS` | 401 | 로그인 실패 |
 | `AUTH_INVALID_REFRESH_TOKEN` | 401 | 유효하지 않은 refresh token |
 | `WORD_NOT_FOUND` | 404 | 단어 없음 또는 소유자 아님 |
+| `AI_GENERATION_FAILED` | 502 | AI 생성/번역 실패 |
+| `AI_NOT_CONFIGURED` | 503 | API 키 미설정 |
+| `AI_DAILY_LIMIT_EXCEEDED` | 429 | 하루 AI 사용량 초과 |
 | `COMMON_INVALID_INPUT` | 400 | 입력값 검증 실패 |
 | `COMMON_INTERNAL_ERROR` | 500 | 서버 내부 오류 |
 
@@ -179,7 +246,7 @@ curl -X POST http://localhost:8080/api/words \
 | profile | 용도 |
 |---|---|
 | `local` | 로컬 개발 (기본값), Redis + Flyway |
-| `test` | 테스트, InMemory Refresh Token Store, Flyway + `ddl-auto: validate` |
+| `test` | 테스트, InMemory Refresh/AI Limiter, Flyway + `ddl-auto: validate` |
 | `prod` | 운영 (`ddl-auto: validate`, 에러 메시지 숨김) |
 
 ## 프로젝트 구조
@@ -198,6 +265,12 @@ word/
   service/WordService
   entity/Word
   repository/WordRepository
+ai/
+  ExampleGenerator / OpenAiExampleGenerator / GeminiExampleGenerator
+  translation/ (Translator, OpenAI/Gemini)
+  quota/ (Redis · InMemory AiUsageLimiter)
+  service/ExampleGenerationService
+  config/AiProperties
 auth/jwt/
   JwtTokenProvider
   JwtAuthenticationFilter
@@ -210,4 +283,5 @@ common/exception/
 config/
   SecurityConfig
   OpenApiConfig
+  RestClientConfig
 ```
