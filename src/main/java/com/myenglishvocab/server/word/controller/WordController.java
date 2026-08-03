@@ -1,5 +1,8 @@
 package com.myenglishvocab.server.word.controller;
 
+import com.myenglishvocab.server.ai.dto.GenerateExampleRequest;
+import com.myenglishvocab.server.ai.dto.GenerateExampleResponse;
+import com.myenglishvocab.server.ai.service.ExampleGenerationService;
 import com.myenglishvocab.server.auth.jwt.JwtPrincipal;
 import com.myenglishvocab.server.common.exception.ErrorResponse;
 import com.myenglishvocab.server.word.dto.CreateWordRequest;
@@ -28,6 +31,7 @@ import java.util.List;
 public class WordController {
 
     private final WordService wordService;
+    private final ExampleGenerationService exampleGenerationService;
 
     @Operation(summary = "내 단어 목록", description = "저장 순서(createdAt 오름차순)로 반환합니다.")
     @GetMapping
@@ -111,5 +115,33 @@ public class WordController {
             @PathVariable Long id
     ) {
         return ResponseEntity.ok(wordService.markLearned(principal.userId(), id));
+    }
+
+    @Operation(
+            summary = "예문 AI 생성",
+            description = """
+                term은 필수, definition은 생략 가능합니다.
+                definition이 없으면 영어 단어를 짧은 한국어 뜻으로 채운 뒤 예문/해석을 생성합니다.
+                계정당 하루 10회까지 사용 가능합니다(한국 시간 기준).
+                결과는 저장되지 않으며, 확인 후 POST /api/words 로 저장하세요.
+                """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "생성 성공"),
+            @ApiResponse(responseCode = "400", description = "입력값 검증 실패",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "502", description = "AI 생성 실패",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "503", description = "AI 미설정",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "429", description = "하루 사용량 초과",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    @PostMapping("/generate-example")
+    public ResponseEntity<GenerateExampleResponse> generateExample(
+            @AuthenticationPrincipal JwtPrincipal principal,
+            @Valid @RequestBody GenerateExampleRequest request
+    ) {
+        return ResponseEntity.ok(exampleGenerationService.generate(principal.userId(), request));
     }
 }
