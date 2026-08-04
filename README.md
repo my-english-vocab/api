@@ -88,6 +88,21 @@ export OPENAI_API_KEY=sk-...
 
 테스트 프로필(`test`)에서는 Redis 대신 인메모리 Refresh Token Store · AI 사용량 Limiter를 사용합니다.
 
+## CORS
+
+브라우저에서 프론트엔드가 API를 호출하려면 CORS가 필요합니다.  
+기본으로 로컬 프론트 Origin을 허용합니다.
+
+```yaml
+cors:
+  allowed-origins:
+    - http://localhost:3000   # Next.js
+    - http://localhost:5173   # Vite
+```
+
+배포 시에는 `application-prod.yaml` 또는 환경별 설정에서 실제 프론트 URL(예: Vercel 도메인)만 허용 목록에 넣으세요.  
+`*`로 전부 여는 방식은 쓰지 않습니다.
+
 ## CI
 
 GitHub Actions가 `main`에 대한 push와 pull request마다 테스트를 실행합니다.
@@ -282,6 +297,8 @@ common/exception/
   GlobalExceptionHandler
 config/
   SecurityConfig
+  CorsConfig
+  CorsProperties
   OpenApiConfig
   RestClientConfig
 ```
