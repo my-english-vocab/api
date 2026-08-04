@@ -55,3 +55,9 @@ ai:
     api-key: ${GEMINI_API_KEY:}
     model: gemini-2.5-flash
     enabled: true
+
+# 프론트엔드 Origin (Next.js 기본 3000, Vite 기본 5173)
+cors:
+  allowed-origins:
+    - http://localhost:3000
+    - http://localhost:5173
