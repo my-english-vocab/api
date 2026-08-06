@@ -11,6 +11,10 @@ spring:
 jwt:
   secret: ${JWT_SECRET}
 
+auth:
+  cookie:
+    secure: true
+
 # 운영 프론트 Origin만 허용 (예시)
 # cors:
 #   allowed-origins:
