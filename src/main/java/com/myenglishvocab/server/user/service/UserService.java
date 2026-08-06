@@ -50,7 +50,7 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public LoginResponse login(LoginRequest request) {
+    public LoginSession login(LoginRequest request) {
         User user = userRepository.findByUsername(request.username())
                 .orElseThrow(() -> {
                     log.warn("로그인 실패 username={} reason=user_not_found", request.username());
@@ -68,18 +68,18 @@ public class UserService {
         String accessToken = jwtTokenProvider.generateAccessToken(user.getId(), user.getUsername());
         String refreshToken = issueRefreshToken(user.getId());
 
-        return new LoginResponse(
+        LoginResponse body = new LoginResponse(
                 user.getId(),
                 user.getUsername(),
                 user.getDisplayName(),
                 accessToken,
-                refreshToken,
                 "Bearer"
         );
+        return new LoginSession(body, refreshToken);
     }
 
     @Transactional(readOnly = true)
-    public TokenResponse refresh(String refreshToken) {
+    public RefreshSession refresh(String refreshToken) {
         Long userId = refreshTokenStore.findUserId(refreshToken)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN));
 
@@ -91,7 +91,7 @@ public class UserService {
         String newRefreshToken = issueRefreshToken(user.getId());
 
         log.info("토큰 재발급 성공 userId={}", userId);
-        return TokenResponse.of(newAccessToken, newRefreshToken);
+        return new RefreshSession(TokenResponse.of(newAccessToken), newRefreshToken);
     }
 
     public void logout(String refreshToken) {

@@ -40,6 +40,10 @@ jwt:
   access-token-expiration: 1800000      # 30분
   refresh-token-expiration: 604800000   # 7일
 
+auth:
+  cookie:
+    secure: false
+
 logging:
   level:
     com.myenglishvocab.server: INFO

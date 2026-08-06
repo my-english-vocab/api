@@ -7,6 +7,8 @@ import com.myenglishvocab.server.common.exception.ErrorCode;
 import com.myenglishvocab.server.config.JwtProperties;
 import com.myenglishvocab.server.user.dto.LoginRequest;
 import com.myenglishvocab.server.user.dto.LoginResponse;
+import com.myenglishvocab.server.user.dto.LoginSession;
+import com.myenglishvocab.server.user.dto.RefreshSession;
 import com.myenglishvocab.server.user.dto.SignupRequest;
 import com.myenglishvocab.server.user.dto.TokenResponse;
 import com.myenglishvocab.server.user.entity.User;
@@ -87,14 +89,15 @@ class UserServiceTest {
         given(jwtTokenProvider.generateAccessToken(1L, "hyungyu")).willReturn("test-access-token");
         given(jwtProperties.getRefreshTokenExpiration()).willReturn(604800000L);
 
-        LoginResponse response = userService.login(new LoginRequest("hyungyu", "password1"));
+        LoginSession session = userService.login(new LoginRequest("hyungyu", "password1"));
+        LoginResponse response = session.body();
 
         assertThat(response.userId()).isEqualTo(1L);
         assertThat(response.username()).isEqualTo("hyungyu");
         assertThat(response.displayName()).isEqualTo("현규");
         assertThat(response.accessToken()).isEqualTo("test-access-token");
-        assertThat(response.refreshToken()).isNotBlank();
         assertThat(response.tokenType()).isEqualTo("Bearer");
+        assertThat(session.refreshToken()).isNotBlank();
 
         verify(jwtTokenProvider).generateAccessToken(eq(1L), eq("hyungyu"));
         ArgumentCaptor<String> refreshTokenCaptor = ArgumentCaptor.forClass(String.class);
@@ -103,7 +106,7 @@ class UserServiceTest {
                 eq(1L),
                 eq(Duration.ofMillis(604800000L))
         );
-        assertThat(response.refreshToken()).isEqualTo(refreshTokenCaptor.getValue());
+        assertThat(session.refreshToken()).isEqualTo(refreshTokenCaptor.getValue());
     }
 
     @Test
@@ -132,15 +135,16 @@ class UserServiceTest {
         given(jwtTokenProvider.generateAccessToken(1L, "hyungyu")).willReturn("new-access");
         given(jwtProperties.getRefreshTokenExpiration()).willReturn(604800000L);
 
-        TokenResponse response = userService.refresh("old-refresh");
+        RefreshSession session = userService.refresh("old-refresh");
+        TokenResponse response = session.body();
 
         assertThat(response.accessToken()).isEqualTo("new-access");
-        assertThat(response.refreshToken()).isNotBlank();
-        assertThat(response.refreshToken()).isNotEqualTo("old-refresh");
+        assertThat(session.refreshToken()).isNotBlank();
+        assertThat(session.refreshToken()).isNotEqualTo("old-refresh");
         assertThat(response.tokenType()).isEqualTo("Bearer");
 
         verify(refreshTokenStore).delete("old-refresh");
-        verify(refreshTokenStore).save(eq(response.refreshToken()), eq(1L), any(Duration.class));
+        verify(refreshTokenStore).save(eq(session.refreshToken()), eq(1L), any(Duration.class));
     }
 
     @Test

@@ -1,6 +1,8 @@
 package com.myenglishvocab.server.user.controller;
 
 import com.jayway.jsonpath.JsonPath;
+import com.myenglishvocab.server.auth.cookie.AuthCookieFactory;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -12,6 +14,7 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -49,12 +52,13 @@ class AuthApiTest {
                                 """.formatted(username)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(cookie().exists(AuthCookieFactory.REFRESH_COOKIE_NAME))
+                .andExpect(cookie().httpOnly(AuthCookieFactory.REFRESH_COOKIE_NAME, true))
                 .andReturn();
 
-        String responseBody = loginResult.getResponse().getContentAsString();
-        String token = JsonPath.read(responseBody, "$.accessToken");
+        String token = JsonPath.read(loginResult.getResponse().getContentAsString(), "$.accessToken");
 
         mockMvc.perform(get("/api/auth/me")
                         .header("Authorization", "Bearer " + token))
@@ -96,23 +100,18 @@ class AuthApiTest {
         String username = "rf_" + System.currentTimeMillis() % 1_000_000_000L;
         signup(username);
 
-        String oldRefreshToken = loginAndGetRefreshToken(username);
+        Cookie oldCookie = loginAndGetRefreshCookie(username);
 
         MvcResult refreshResult = mockMvc.perform(post("/api/auth/refresh")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "refreshToken": "%s"
-                                }
-                                """.formatted(oldRefreshToken)))
+                        .cookie(oldCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(cookie().exists(AuthCookieFactory.REFRESH_COOKIE_NAME))
                 .andReturn();
 
-        String refreshBody = refreshResult.getResponse().getContentAsString();
-        String newAccessToken = JsonPath.read(refreshBody, "$.accessToken");
-        String newRefreshToken = JsonPath.read(refreshBody, "$.refreshToken");
+        String newAccessToken = JsonPath.read(refreshResult.getResponse().getContentAsString(), "$.accessToken");
+        Cookie newCookie = refreshResult.getResponse().getCookie(AuthCookieFactory.REFRESH_COOKIE_NAME);
 
         mockMvc.perform(get("/api/auth/me")
                         .header("Authorization", "Bearer " + newAccessToken))
@@ -120,23 +119,12 @@ class AuthApiTest {
                 .andExpect(jsonPath("$.username").value(username));
 
         mockMvc.perform(post("/api/auth/refresh")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "refreshToken": "%s"
-                                }
-                                """.formatted(oldRefreshToken)))
+                        .cookie(oldCookie))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("AUTH_INVALID_REFRESH_TOKEN"));
 
-        // 새 refresh는 여전히 유효해야 한다
         mockMvc.perform(post("/api/auth/refresh")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "refreshToken": "%s"
-                                }
-                                """.formatted(newRefreshToken)))
+                        .cookie(newCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty());
     }
@@ -145,37 +133,26 @@ class AuthApiTest {
     void logout_후_refresh는_무효화된다() throws Exception {
         String username = "lo_" + System.currentTimeMillis() % 1_000_000_000L;
         signup(username);
-        String refreshToken = loginAndGetRefreshToken(username);
+        Cookie refreshCookie = loginAndGetRefreshCookie(username);
 
         mockMvc.perform(post("/api/auth/logout")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "refreshToken": "%s"
-                                }
-                                """.formatted(refreshToken)))
-                .andExpect(status().isNoContent());
+                        .cookie(refreshCookie))
+                .andExpect(status().isNoContent())
+                .andExpect(cookie().maxAge(AuthCookieFactory.REFRESH_COOKIE_NAME, 0));
 
         mockMvc.perform(post("/api/auth/refresh")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "refreshToken": "%s"
-                                }
-                                """.formatted(refreshToken)))
+                        .cookie(refreshCookie))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("AUTH_INVALID_REFRESH_TOKEN"));
     }
 
     @Test
     void 잘못된_refresh면_401_표준_에러응답() throws Exception {
+        Cookie fake = new Cookie(AuthCookieFactory.REFRESH_COOKIE_NAME, "not-a-real-token");
+        fake.setPath("/api/auth");
+
         mockMvc.perform(post("/api/auth/refresh")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "refreshToken": "not-a-real-token"
-                                }
-                                """))
+                        .cookie(fake))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("AUTH_INVALID_REFRESH_TOKEN"));
     }
@@ -193,7 +170,7 @@ class AuthApiTest {
                 .andExpect(status().isCreated());
     }
 
-    private String loginAndGetRefreshToken(String username) throws Exception {
+    private Cookie loginAndGetRefreshCookie(String username) throws Exception {
         MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -203,9 +180,9 @@ class AuthApiTest {
                                 }
                                 """.formatted(username)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
+                .andExpect(cookie().exists(AuthCookieFactory.REFRESH_COOKIE_NAME))
                 .andReturn();
 
-        return JsonPath.read(loginResult.getResponse().getContentAsString(), "$.refreshToken");
+        return loginResult.getResponse().getCookie(AuthCookieFactory.REFRESH_COOKIE_NAME);
     }
 }

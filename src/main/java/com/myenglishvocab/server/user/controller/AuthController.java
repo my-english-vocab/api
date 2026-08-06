@@ -1,7 +1,11 @@
 package com.myenglishvocab.server.user.controller;
 
+import com.myenglishvocab.server.auth.cookie.AuthCookieFactory;
 import com.myenglishvocab.server.auth.jwt.JwtPrincipal;
+import com.myenglishvocab.server.common.exception.BusinessException;
+import com.myenglishvocab.server.common.exception.ErrorCode;
 import com.myenglishvocab.server.common.exception.ErrorResponse;
+import com.myenglishvocab.server.config.JwtProperties;
 import com.myenglishvocab.server.user.dto.*;
 import com.myenglishvocab.server.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,10 +17,15 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.Duration;
 
 @Tag(name = "Auth", description = "회원가입/로그인/토큰 재발급/로그아웃/내 정보")
 @RestController
@@ -25,6 +34,10 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final UserService userService;
+    private final JwtProperties jwtProperties;
+
+    @Value("${auth.cookie.secure:false}")
+    private boolean cookieSecure;
 
     @Operation(summary = "회원가입")
     @SecurityRequirements
@@ -34,12 +47,22 @@ public class AuthController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @Operation(summary = "로그인", description = "성공 시 accessToken + refreshToken 반환")
+    @Operation(
+            summary = "로그인",
+            description = "성공 시 body에 accessToken, Set-Cookie(httpOnly)에 refreshToken을 담습니다."
+    )
     @SecurityRequirements
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        LoginResponse response = userService.login(request);
-        return ResponseEntity.ok(response);
+        LoginSession session = userService.login(request);
+        ResponseCookie refreshCookie = AuthCookieFactory.createRefreshCookie(
+                session.refreshToken(),
+                Duration.ofMillis(jwtProperties.getRefreshTokenExpiration()),
+                cookieSecure
+        );
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+                .body(session.body());
     }
 
     @Operation(summary = "내 정보 조회", description = "Authorization: Bearer {accessToken} 필요")
@@ -57,7 +80,7 @@ public class AuthController {
 
     @Operation(
             summary = "토큰 재발급",
-            description = "Refresh Token으로 새 accessToken/refreshToken을 발급합니다. 기존 refreshToken은 즉시 무효화됩니다(rotation)."
+            description = "httpOnly 쿠키의 Refresh Token으로 새 accessToken을 발급하고, 쿠키의 refresh를 교체합니다(RTR)."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "재발급 성공"),
@@ -66,21 +89,46 @@ public class AuthController {
     })
     @SecurityRequirements
     @PostMapping("/refresh")
-    public ResponseEntity<TokenResponse> refresh(@Valid @RequestBody RefreshRequest request) {
-        return ResponseEntity.ok(userService.refresh(request.refreshToken()));
+    public ResponseEntity<TokenResponse> refresh(
+            @CookieValue(name = AuthCookieFactory.REFRESH_COOKIE_NAME, required = false) String refreshToken
+    ) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
+        }
+
+        RefreshSession session = userService.refresh(refreshToken);
+
+        ResponseCookie refreshCookie = AuthCookieFactory.createRefreshCookie(
+                session.refreshToken(),
+                Duration.ofMillis(jwtProperties.getRefreshTokenExpiration()),
+                cookieSecure
+        );
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+                .body(session.body());
     }
 
     @Operation(
             summary = "로그아웃",
-            description = "Refresh Token을 서버에서 삭제합니다. 이미 없거나 만료된 토큰이어도 204를 반환합니다."
+            description = "Refresh Token을 Redis에서 삭제하고, 쿠키를 만료시킵니다."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "로그아웃 처리 완료")
     })
     @SecurityRequirements
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@Valid @RequestBody RefreshRequest request) {
-        userService.logout(request.refreshToken());
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<Void> logout(
+            @CookieValue(name = AuthCookieFactory.REFRESH_COOKIE_NAME, required = false) String refreshToken
+    ) {
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            userService.logout(refreshToken);
+        }
+
+        ResponseCookie clear = AuthCookieFactory.clearRefreshCookie(cookieSecure);
+
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, clear.toString())
+                .build();
     }
 }
