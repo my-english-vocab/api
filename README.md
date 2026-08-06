@@ -134,20 +134,20 @@ rm -f vocabdb.mv.db vocabdb.trace.db
 
 ## 인증 흐름
 1. `POST /api/auth/signup` — 회원가입
-2. `POST /api/auth/login` — `accessToken` + `refreshToken` 발급
+2. `POST /api/auth/login` — body에 `accessToken`, **httpOnly 쿠키**에 `refreshToken`
 3. `Authorization: Bearer {accessToken}` 헤더로 보호 API 호출
-4. Access 만료 시 `POST /api/auth/refresh` — 새 토큰 쌍 발급 (기존 refresh는 폐기, rotation)
-5. `POST /api/auth/logout` — Refresh Token 무효화
+4. Access 만료 시 `POST /api/auth/refresh` — 쿠키의 refresh로 재발급 (RTR, Set-Cookie로 새 refresh)
+5. `POST /api/auth/logout` — Redis refresh 삭제 + 쿠키 만료
 6. `GET /api/auth/me` — 인증된 사용자 정보 조회
 
 Swagger UI에서 **Authorize** 버튼으로 Bearer accessToken을 등록한 뒤 보호 API를 호출할 수 있습니다.  
-refresh / logout은 body에 `refreshToken`을 넣습니다.
+브라우저/프론트는 refresh·logout 시 `credentials: include`로 쿠키를 전송합니다. Bruno는 쿠키 jar를 켜면 됩니다.
 
 ### 토큰 역할
 | 토큰 | 수명(기본) | 저장 | 용도 |
 |---|---|---|---|
-| Access Token (JWT) | 30분 | 클라이언트 | API 인증 |
-| Refresh Token (UUID) | 7일 | Redis (`refresh:{token}` → userId) | Access 재발급 / 로그아웃 |
+| Access Token (JWT) | 30분 | 클라이언트 메모리 | API 인증 (Bearer) |
+| Refresh Token (UUID) | 7일 | Redis + **httpOnly 쿠키** | Access 재발급 / 로그아웃 |
 
 ## 단어장 API
 

@@ -21,10 +21,10 @@ public class OpenApiConfig {
                                 
                                 ## 인증 흐름
                                 1. POST /api/auth/signup — 회원가입
-                                2. POST /api/auth/login — accessToken + refreshToken 발급
+                                2. POST /api/auth/login — body에 accessToken, Set-Cookie(httpOnly)에 refreshToken
                                 3. Authorize에 Bearer {accessToken} 입력 후 보호 API 호출
-                                4. Access 만료 시 POST /api/auth/refresh 로 재발급 (refresh rotation)
-                                5. POST /api/auth/logout — Refresh Token 무효화
+                                4. Access 만료 시 POST /api/auth/refresh (쿠키의 refresh 사용, rotation)
+                                5. POST /api/auth/logout — Refresh 쿠키/Redis 무효화
                                 
                                 ## 단어장 API (Bearer 인증 필요)
                                 - GET /api/words — 내 단어 목록
