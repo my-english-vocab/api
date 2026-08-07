@@ -1,4 +1,10 @@
 spring:
+  datasource:
+    url: ${DB_URL}
+    driver-class-name: org.postgresql.Driver
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+
   jpa:
     hibernate:
       ddl-auto: validate
@@ -8,6 +14,16 @@ spring:
     error:
       include-message: never
 
+  h2:
+    console:
+      enabled: false
+
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    enabled: false
+
 jwt:
   secret: ${JWT_SECRET}
 
@@ -15,7 +31,10 @@ auth:
   cookie:
     secure: true
 
-# 운영 프론트 Origin만 허용 (예시)
-# cors:
-#   allowed-origins:
-#     - https://your-app.vercel.app
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS}
+
+ai:
+  provider: ${AI_PROVIDER:openai}
+  gemini:
+    enabled: ${GEMINI_ENABLED:true}

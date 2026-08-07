@@ -4,6 +4,7 @@ import com.myenglishvocab.server.auth.jwt.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -20,9 +21,20 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final Environment environment;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        boolean h2ConsoleEnabled = environment.getProperty(
+                "spring.h2.console.enabled", Boolean.class, true
+        );
+        boolean swaggerUiEnabled = environment.getProperty(
+                "springdoc.swagger-ui.enabled", Boolean.class, true
+        );
+        boolean apiDocsEnabled = environment.getProperty(
+                "springdoc.api-docs.enabled", Boolean.class, true
+        );
+
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
@@ -31,19 +43,26 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/error").permitAll()
-                        .requestMatchers("/h2-console/**").permitAll()
-                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                        .requestMatchers(HttpMethod.POST,
-                                "/api/auth/signup",
-                                "/api/auth/login",
-                                "/api/auth/refresh",
-                                "/api/auth/logout"
-                        ).permitAll()
-                        .anyRequest().authenticated()
-                )
+                .authorizeHttpRequests(auth -> {
+                    auth.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                            .requestMatchers("/error").permitAll();
+
+                    if (h2ConsoleEnabled) {
+                        auth.requestMatchers("/h2-console/**").permitAll();
+                    }
+
+                    if (swaggerUiEnabled || apiDocsEnabled) {
+                        auth.requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll();
+                    }
+
+                    auth.requestMatchers(HttpMethod.POST,
+                                    "/api/auth/signup",
+                                    "/api/auth/login",
+                                    "/api/auth/refresh",
+                                    "/api/auth/logout"
+                            ).permitAll()
+                            .anyRequest().authenticated();
+                })
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

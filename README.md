@@ -7,19 +7,19 @@ JWT Access Token + Redis Refresh Token 인증, 사용자별 단어장 API, AI �
 - Java 21, Spring Boot 4
 - Spring Security + JWT (jjwt)
 - Spring Data Redis (Refresh Token · AI 일일 사용량)
-- Spring Data JPA, H2
+- Spring Data JPA, H2, PostgreSQL
 - Flyway (DB 스키마 마이그레이션)
 - OpenAI / Gemini (예문·뜻 생성, provider 전환 가능)
 - SpringDoc OpenAPI
-- Docker Compose (로컬 Redis)
+- Docker Compose (로컬 Redis, PostgreSQL)
 - GitHub Actions CI (PR/`main` push 시 `./gradlew test`)
 
 ## 로컬 실행
 
 Docker Desktop을 먼저 실행한 뒤, `server/` 디렉터리에서 아래를 진행하세요.
 
-### 1) Redis (Docker Compose)
-Refresh Token과 AI 일일 사용량 카운트에 Redis가 필요합니다. Compose로 기동합니다.
+### 1) Redis와 PostgreSQL (Docker Compose)
+Refresh Token·AI 일일 사용량에는 Redis가 필요하고, PostgreSQL 프로필 실습에는 PostgreSQL이 필요합니다. Compose로 함께 기동합니다.
 
 ```bash
 docker compose up -d
@@ -43,7 +43,7 @@ docker compose down
 docker compose down -v
 ```
 
-> `docker-compose.yml`은 Redis만 포함합니다. 애플리케이션은 아래 `./gradlew bootRun`으로 실행합니다.
+> `docker-compose.yml`은 로컬 학습용 Redis와 PostgreSQL을 실행합니다. 애플리케이션은 아래 `./gradlew bootRun`으로 실행합니다.
 
 ### 2) 환경변수
 ```bash
@@ -53,20 +53,23 @@ cp .env.example .env
 `.env`에서 아래를 설정하세요.  
 또는 `application-local.yaml`(gitignore)을 사용해도 됩니다.
 
-| 변수 | 필수 | 설명 |
+| 변수 | 필수인 경우 | 설명 |
 |---|---|---|
-| `JWT_SECRET` | 예 | 최소 32자 |
-| `SPRING_PROFILES_ACTIVE` | 아니오 | 기본 `local` |
+| `JWT_SECRET` | 항상 | 최소 32자 이상 JWT 서명 키 |
+| `SPRING_PROFILES_ACTIVE` | 아니오 | `local`(기본), `postgres`, `prod` |
 | `REDIS_HOST` / `REDIS_PORT` | 아니오 | 기본 `localhost` / `6379` |
-| `OPENAI_API_KEY` | AI 사용 시 (기본 provider) | OpenAI API 키 |
-| `GEMINI_API_KEY` | `ai.provider=gemini`일 때 | Gemini API 키 |
+| `DB_URL` / `DB_USERNAME` / `DB_PASSWORD` | `prod` | 운영 PostgreSQL 연결 정보 |
+| `CORS_ALLOWED_ORIGINS` | `prod` | 허용할 프론트 origin 목록. 여러 값은 쉼표로 구분 |
+| `AI_PROVIDER` | 아니오 | `openai`(기본) 또는 `gemini` |
+| `OPENAI_API_KEY` | `AI_PROVIDER=openai` | OpenAI API 키 |
+| `GEMINI_ENABLED` / `GEMINI_API_KEY` | `AI_PROVIDER=gemini` | Gemini 활성화 여부와 API 키 |
+
+Spring Boot는 `.env` 파일을 자동으로 읽지 않으므로, 실행 전에 아래 명령으로 현재 터미널의 환경 변수로 불러옵니다.
 
 ```bash
-export JWT_SECRET=local-dev-secret-key-must-be-at-least-32-characters-long
-export SPRING_PROFILES_ACTIVE=local
-export REDIS_HOST=localhost
-export REDIS_PORT=6379
-export OPENAI_API_KEY=sk-...
+set -a
+source .env
+set +a
 ```
 
 ### 3) 서버 실행
@@ -76,10 +79,29 @@ export OPENAI_API_KEY=sk-...
 
 - API: http://localhost:8080
 - Swagger UI: http://localhost:8080/swagger-ui/index.html
-- H2 Console: http://localhost:8080/h2-console  
+- H2 Console (`local` 프로필): http://localhost:8080/h2-console
   - JDBC URL: `jdbc:h2:file:./vocabdb`
   - Username: `sa`
   - Password: (비움)
+
+### PostgreSQL 프로필로 실행
+
+Docker PostgreSQL을 사용하려면 `.env`에서 아래처럼 설정합니다.
+
+```dotenv
+SPRING_PROFILES_ACTIVE=postgres
+```
+
+그 후 환경 변수를 불러오고 서버를 실행합니다.
+
+```bash
+set -a
+source .env
+set +a
+./gradlew bootRun
+```
+
+첫 실행 시 Flyway가 PostgreSQL에 `users`, `words`, `flyway_schema_history` 테이블을 생성합니다.
 
 ### 4) 테스트
 ```bash
@@ -100,8 +122,64 @@ cors:
     - http://localhost:5173   # Vite
 ```
 
-배포 시에는 `application-prod.yaml` 또는 환경별 설정에서 실제 프론트 URL(예: Vercel 도메인)만 허용 목록에 넣으세요.  
-`*`로 전부 여는 방식은 쓰지 않습니다.
+운영에서는 `application-prod.yaml`이 `CORS_ALLOWED_ORIGINS` 환경 변수를 읽습니다.
+
+```dotenv
+CORS_ALLOWED_ORIGINS=https://myenglishvocab.example.com
+```
+
+여러 프론트 주소를 허용해야 한다면 쉼표로 구분합니다.
+
+```dotenv
+CORS_ALLOWED_ORIGINS=https://app.example.com,https://www.example.com
+```
+
+`*`로 모든 origin을 허용하지 않습니다. 이 서버는 refresh token 쿠키를 사용하므로, 허용할 프론트 주소를 명시해야 합니다.
+
+## Refresh Token Cookie 배포 정책
+
+Refresh token은 JavaScript가 읽을 수 없는 httpOnly 쿠키로 저장합니다. 현재 정책은 다음과 같습니다.
+
+| 속성 | 현재 값 | 의미 |
+|---|---|---|
+| `HttpOnly` | `true` | JavaScript로 token 값을 읽을 수 없음 |
+| `Secure` | local: `false`, prod: `true` | 운영에서는 HTTPS 연결에서만 쿠키 전송 |
+| `SameSite` | `Lax` | 같은 site 요청에서만 기본적으로 쿠키 전송 |
+| `Path` | `/api/auth` | refresh·logout 등 인증 API에만 쿠키 전송 |
+
+현재 정책은 프론트와 API가 같은 site에 있는 배포에 맞습니다. 예를 들어 `app.example.com`과 `api.example.com`은 같은 site로 취급됩니다. 프론트는 refresh·logout 요청에 반드시 `credentials: include`를 설정해야 합니다.
+
+```ts
+fetch("https://api.example.com/api/auth/refresh", {
+  method: "POST",
+  credentials: "include"
+});
+```
+
+프론트와 API가 완전히 다른 site라면(예: Vercel 기본 도메인과 별도 API 도메인), 현재 `SameSite=Lax` 정책으로는 refresh cookie가 전송되지 않을 수 있습니다. 그때는 `SameSite=None`과 `Secure=true`로 변경하고, CORS allowlist·CSRF 위험·브라우저의 third-party cookie 제한을 함께 검토해야 합니다. 이 변경은 배포 도메인이 확정된 뒤 별도 작업으로 진행합니다.
+
+## 운영 배포 설정
+
+`prod` 프로필은 H2 Console과 Swagger UI/API Docs를 비활성화합니다. 시작 시 다음 값을 검증합니다.
+
+- `JWT_SECRET`: 32자 이상
+- `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`: 운영 PostgreSQL 연결 정보
+- `CORS_ALLOWED_ORIGINS`: 실제 프론트 origin
+- `AI_PROVIDER=openai`: `OPENAI_API_KEY`
+- `AI_PROVIDER=gemini`: `GEMINI_ENABLED=true`, `GEMINI_API_KEY`, Gemini model
+
+운영 예시는 다음과 같습니다.
+
+```bash
+SPRING_PROFILES_ACTIVE=prod
+DB_URL=jdbc:postgresql://localhost:5432/myenglishvocab
+DB_USERNAME=vocab_app
+DB_PASSWORD=change-me-to-a-long-random-password
+CORS_ALLOWED_ORIGINS=https://myenglishvocab.example.com
+JWT_SECRET=change-me-to-a-long-random-secret-at-least-32-characters
+AI_PROVIDER=openai
+OPENAI_API_KEY=your-openai-api-key
+```
 
 ## CI
 
@@ -122,7 +200,7 @@ PR 페이지의 **Checks / Actions** 탭에서 결과를 확인할 수 있습니
   - `V2__create_words.sql` — words 테이블
 - 앱 기동 시 Flyway가 아직 적용되지 않은 버전만 순서대로 실행합니다.
 - JPA `ddl-auto`는 `validate`입니다. (엔티티와 DB 스키마 일치만 검사)
-- 적용 이력은 H2의 `flyway_schema_history` 테이블에서 확인할 수 있습니다.
+- 적용 이력은 현재 사용하는 DB(H2 또는 PostgreSQL)의 `flyway_schema_history` 테이블에서 확인할 수 있습니다.
 
 로컬에서 스키마를 처음부터 다시 적용하려면 서버를 끈 뒤 H2 파일을 삭제하세요.
 
@@ -140,7 +218,15 @@ rm -f vocabdb.mv.db vocabdb.trace.db
 5. `POST /api/auth/logout` — Redis refresh 삭제 + 쿠키 만료
 6. `GET /api/auth/me` — 인증된 사용자 정보 조회
 
-Swagger UI에서 **Authorize** 버튼으로 Bearer accessToken을 등록한 뒤 보호 API를 호출할 수 있습니다.  
+### Swagger UI에서 Bearer 인증하기
+
+1. `POST /api/auth/login`을 실행하고 응답 body의 `accessToken` 값을 복사합니다.
+2. Swagger UI 오른쪽 위의 **Authorize** 버튼을 누릅니다.
+3. `bearerAuth` 입력칸에 **`Bearer`를 제외한 accessToken 값만** 붙여넣습니다.
+4. Authorize를 누른 뒤 보호 API를 호출합니다.
+
+Swagger의 HTTP Bearer 보안 방식은 `Authorization: Bearer {accessToken}` 헤더를 자동으로 만듭니다. 따라서 입력칸에 `Bearer `까지 넣으면 `Bearer Bearer ...`가 되어 인증에 실패할 수 있습니다.
+
 브라우저/프론트는 refresh·logout 시 `credentials: include`로 쿠키를 전송합니다. Bruno는 쿠키 jar를 켜면 됩니다.
 
 ### 토큰 역할
@@ -192,18 +278,12 @@ curl -X POST http://localhost:8080/api/words \
 4. 계정당 하루 사용량 차감 (`ai.daily-limit`, 기본 10회, 한국 시간 기준)
 
 ### Provider 전환
-`src/main/resources/application.yaml`의 `ai.provider`로 전환합니다. 변경 후 서버를 재시작하세요.
+환경 변수 `AI_PROVIDER`로 전환합니다. 변경 후 서버를 재시작하세요.
 
-```yaml
-ai:
-  provider: openai        # openai | gemini
-  daily-limit: 10
-  openai:
-    api-key: ${OPENAI_API_KEY:}
-    model: gpt-4o-mini
-  gemini:
-    api-key: ${GEMINI_API_KEY:}
-    model: gemini-2.5-flash
+```dotenv
+AI_PROVIDER=gemini
+GEMINI_ENABLED=true
+GEMINI_API_KEY=your-gemini-api-key
 ```
 
 | provider | 필요 키 | 구현 |
@@ -260,14 +340,15 @@ curl -X POST http://localhost:8080/api/words/generate-example \
 ## Profiles
 | profile | 용도 |
 |---|---|
-| `local` | 로컬 개발 (기본값), Redis + Flyway |
-| `test` | 테스트, InMemory Refresh/AI Limiter, Flyway + `ddl-auto: validate` |
-| `prod` | 운영 (`ddl-auto: validate`, 에러 메시지 숨김) |
+| `local` | 로컬 개발 기본값, 파일 기반 H2 + Redis |
+| `postgres` | 로컬 Docker PostgreSQL + Redis |
+| `test` | 메모리 H2, InMemory Refresh Token·AI Limiter |
+| `prod` | 환경 변수 PostgreSQL, H2·Swagger 비활성화, 오류 메시지 숨김 |
 
 ## 프로젝트 구조
 ```
 .github/workflows/ci.yml      # GitHub Actions CI
-docker-compose.yml            # 로컬 Redis
+docker-compose.yml            # 로컬 Redis, PostgreSQL
 src/main/resources/db/migration/
   V1__create_users.sql
   V2__create_words.sql

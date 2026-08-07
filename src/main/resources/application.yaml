@@ -32,6 +32,12 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
 
+springdoc:
+  swagger-ui:
+    enabled: true
+  api-docs:
+    enabled: true
+
 server:
   port: 8080
 
@@ -50,15 +56,21 @@ logging:
     org.springframework.security: WARN
 
 ai:
-  provider: openai # openai or gemini
+  provider: ${AI_PROVIDER:openai} # openai or gemini
   daily-limit: 10
+
+  timeout:
+    connect: 5s
+    response: 30s
+
   openai:
     api-key: ${OPENAI_API_KEY:}
     model: gpt-4o-mini
+
   gemini:
     api-key: ${GEMINI_API_KEY:}
     model: gemini-2.5-flash
-    enabled: true
+    enabled: ${GEMINI_ENABLED:true}
 
 # 프론트엔드 Origin (Next.js 기본 3000, Vite 기본 5173)
 cors:

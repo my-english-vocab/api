@@ -1,0 +1,10 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/myenglishvocab
+    driver-class-name: org.postgresql.Driver
+    username: ${DB_USERNAME:vocab_app}
+    password: ${DB_PASSWORD:local-vocab-password}
+
+  h2:
+    console:
+      enabled: false
