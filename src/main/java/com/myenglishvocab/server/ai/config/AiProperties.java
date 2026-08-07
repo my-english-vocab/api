@@ -5,6 +5,8 @@ import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
+
 @Getter
 @Setter
 @Component
@@ -24,6 +26,8 @@ public class AiProperties {
     private OpenAi openai = new OpenAi();
     private Gemini gemini = new Gemini();
 
+    private Timeout timeout = new Timeout();
+
     @Getter
     @Setter
     public static class OpenAi {
@@ -37,5 +41,12 @@ public class AiProperties {
         private String apiKey = "";
         private String model = "gemini-2.5-flash";
         private boolean enabled = true;
+    }
+
+    @Getter
+    @Setter
+    public static class Timeout {
+        private Duration connect = Duration.ofSeconds(5);
+        private Duration response = Duration.ofSeconds(30);
     }
 }
