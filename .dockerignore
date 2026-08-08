@@ -1,0 +1,11 @@
+.git
+.github
+.gradle
+.idea
+build
+.env
+*.iml
+*.mv.db
+*.trace.db
+README.md
+HELP.md
