@@ -8,6 +8,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+    open-in-view: false
     show-sql: false
 
   profiles:
@@ -33,3 +34,10 @@ cors:
   allowed-origins:
     - http://localhost:3000
     - http://localhost:5173
+
+# 테스트에서는 Redis 기반 저장소 대신 인메모리 구현을 사용하므로,
+# Actuator가 실행되지 않은 Redis를 확인해 전체 상태를 DOWN으로 만들지 않게 한다.
+management:
+  health:
+    redis:
+      enabled: false

@@ -45,7 +45,8 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> {
                     auth.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                            .requestMatchers("/error").permitAll();
+                            .requestMatchers("/error").permitAll()
+                            .requestMatchers("/actuator/health").permitAll();
 
                     if (h2ConsoleEnabled) {
                         auth.requestMatchers("/h2-console/**").permitAll();

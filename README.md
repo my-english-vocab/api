@@ -3,6 +3,8 @@
 Spring Boot 기반 영어 단어장 API 서버입니다.  
 JWT Access Token + Redis Refresh Token 인증, 사용자별 단어장 API, AI 예문 생성, 표준 에러 응답을 적용했습니다.
 
+현재 로컬에서는 Docker Compose로 백엔드·PostgreSQL·Redis를 함께 실행할 수 있으며, Health Check와 전체 백엔드 테스트까지 검증한 상태입니다. 실제 운영 환경에는 아직 배포하지 않았습니다.
+
 ## Tech Stack
 - Java 21, Spring Boot 4
 - Spring Security + JWT (jjwt)
@@ -11,7 +13,8 @@ JWT Access Token + Redis Refresh Token 인증, 사용자별 단어장 API, AI �
 - Flyway (DB 스키마 마이그레이션)
 - OpenAI / Gemini (예문·뜻 생성, provider 전환 가능)
 - SpringDoc OpenAPI
-- Docker Compose (로컬 Redis, PostgreSQL)
+- Spring Boot Actuator (Health Check)
+- Docker · Docker Compose (백엔드, Redis, PostgreSQL)
 - GitHub Actions CI (PR/`main` push 시 `./gradlew test`)
 
 ## 로컬 실행
@@ -22,7 +25,7 @@ Docker Desktop을 먼저 실행한 뒤, `server/` 디렉터리에서 아래를 �
 Refresh Token·AI 일일 사용량에는 Redis가 필요하고, PostgreSQL 프로필 실습에는 PostgreSQL이 필요합니다. Compose로 함께 기동합니다.
 
 ```bash
-docker compose up -d
+docker compose up -d redis postgres
 ```
 
 상태 확인:
@@ -43,7 +46,7 @@ docker compose down
 docker compose down -v
 ```
 
-> `docker-compose.yml`은 로컬 학습용 Redis와 PostgreSQL을 실행합니다. 애플리케이션은 아래 `./gradlew bootRun`으로 실행합니다.
+> `docker compose up -d redis postgres`는 Redis와 PostgreSQL만 실행합니다. 애플리케이션은 아래 `./gradlew bootRun`으로 실행합니다. 백엔드까지 컨테이너로 실행하려면 [운영 유사 컨테이너 실행](#운영-유사-컨테이너-실행)을 사용하세요.
 
 ### 2) 환경변수
 ```bash
@@ -103,12 +106,82 @@ set +a
 
 첫 실행 시 Flyway가 PostgreSQL에 `users`, `words`, `flyway_schema_history` 테이블을 생성합니다.
 
-### 4) 테스트
+### 운영 유사 컨테이너 실행
+
+백엔드·PostgreSQL·Redis를 모두 컨테이너로 실행해 배포 환경과 비슷하게 확인할 수 있습니다.
+
+`.env` 파일은 선택 사항입니다. 새로 clone한 뒤에도 Compose는 로컬 PostgreSQL 프로필과 컨테이너 전용 JWT 기본값으로 실행됩니다. 단, 기본값은 로컬 학습용이므로 실제 운영 배포에 사용하면 안 됩니다.
+
+AI 예문 생성까지 사용하려면 `.env`에 사용할 Provider의 API Key를 설정하세요. `.env` 파일은 Git과 Docker 이미지에 포함되지 않습니다.
+
+그 다음 이미지를 빌드하고 모든 컨테이너를 시작합니다.
+
 ```bash
-./gradlew test
+docker compose up --build -d
 ```
 
-테스트 프로필(`test`)에서는 Redis 대신 인메모리 Refresh Token Store · AI 사용량 Limiter를 사용합니다.
+Compose의 `app` 서비스는 기본으로 `postgres` 프로필로 실행됩니다. 컨테이너 내부에서는 `localhost` 대신 서비스 이름인 `postgres`, `redis`로 연결합니다.
+
+실제 운영 설정을 점검하려면 실제 JWT Secret, AI API Key, CORS Origin을 환경 변수로 설정한 뒤 `prod` 프로필을 명시합니다.
+
+```bash
+COMPOSE_SPRING_PROFILE=prod docker compose up --build -d
+```
+
+`prod` 프로필은 필수 운영 환경 변수가 없으면 시작하지 않습니다. 이 검증은 실제 배포에서 설정 누락을 조기에 발견하기 위한 것입니다.
+
+상태를 확인합니다.
+
+```bash
+docker compose ps
+```
+
+`vocab-server`, `vocab-postgres`, `vocab-redis`가 모두 `healthy`가 되면 정상입니다.
+
+Health Check는 인증 없이 호출할 수 있습니다.
+
+```bash
+curl -i http://localhost:8080/actuator/health
+```
+
+정상 응답에는 `status: UP`이 포함됩니다. `groups`는 Spring Boot의 상태 그룹 이름이며, DB·Redis 등의 상세 구성요소는 외부에 노출하지 않습니다.
+
+```json
+{"groups":["liveness","readiness"],"status":"UP"}
+```
+
+반대로 다른 관리 경로는 인증 없이는 접근할 수 없습니다.
+
+```bash
+curl -i http://localhost:8080/actuator
+```
+
+이 요청은 `403 Forbidden`이 기대 결과입니다.
+
+앱 로그는 다음 명령으로 확인합니다.
+
+```bash
+docker compose logs -f app
+```
+
+종료 시 데이터 volume을 유지하려면 아래 명령을 사용합니다.
+
+```bash
+docker compose down
+```
+
+처음부터 다시 검증해야 할 때만 volume까지 삭제합니다. 이 명령은 PostgreSQL·Redis 데이터를 삭제합니다.
+
+```bash
+docker compose down -v
+```
+
+### 4) 테스트
+```bash
+./gradlew test --rerun-tasks
+```
+
+테스트 프로필(`test`)에서는 Redis 대신 인메모리 Refresh Token Store · AI 사용량 Limiter를 사용합니다. `OperationsEndpointTest`는 운영 프로필에서 `/actuator/health`만 공개되고 상세 상태가 숨겨지는지, Spring Security의 기본 사용자가 자동 생성되지 않는지도 검증합니다. JPA의 `open-in-view`는 모든 프로필에서 `false`로 두어 요청 처리 중 영속성 컨텍스트가 불필요하게 유지되지 않도록 했습니다.
 
 ## CORS
 
@@ -180,6 +253,10 @@ JWT_SECRET=change-me-to-a-long-random-secret-at-least-32-characters
 AI_PROVIDER=openai
 OPENAI_API_KEY=your-openai-api-key
 ```
+
+프론트와 API는 `app.example.com`, `api.example.com`처럼 같은 최상위 도메인의 HTTPS 주소를 사용하는 구성을 권장합니다. EC2 등에 배포할 때 PostgreSQL `5432`, Redis `6379`, Spring Boot `8080` 포트를 인터넷에 직접 공개하지 않고, 외부 요청은 HTTPS가 적용된 프록시나 로드밸런서를 통해 전달합니다.
+
+배포 후에는 `/actuator/health`뿐 아니라 회원가입, 로그인, 새로고침 후 로그인 복구, 로그아웃, 단어 CRUD, AI 생성과 퀴즈까지 Smoke Test를 진행합니다.
 
 ## CI
 
