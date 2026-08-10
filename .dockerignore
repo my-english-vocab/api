@@ -4,6 +4,7 @@
 .idea
 build
 .env
+.env.production
 *.iml
 *.mv.db
 *.trace.db

@@ -176,6 +176,55 @@ docker compose down
 docker compose down -v
 ```
 
+## 실제 운영 Compose 준비
+
+로컬용 `docker-compose.yml`은 학습과 통합 실행을 위해 PostgreSQL, Redis, Spring Boot 포트를 호스트에 공개합니다. 실제 EC2에서는 이를 사용하지 않고 `docker-compose.prod.yml`을 사용합니다.
+
+운영 Compose는 Nginx만 `80`, `443` 포트를 공개합니다. PostgreSQL(`5432`), Redis(`6379`), Spring Boot(`8080`)는 Docker 내부 네트워크에만 두고, Nginx가 HTTPS 요청을 `app:8080`으로 전달합니다.
+
+### 운영 환경 변수
+
+운영 비밀값은 Git에 넣지 않습니다. EC2에서만 아래처럼 만듭니다.
+
+```bash
+cp .env.production.example .env.production
+chmod 600 .env.production
+```
+
+`.env.production`에는 강한 DB 비밀번호, 32자 이상의 JWT Secret, 선택한 AI Provider의 API Key를 입력합니다. `CORS_ALLOWED_ORIGINS`에는 정확히 `https://app.myenglishvocab.com`을 설정합니다.
+
+### Nginx와 Certbot HTTPS 흐름
+
+Certbot을 실행하기 전에 Cloudflare DNS에서 `api.myenglishvocab.com`의 `A` 레코드가 EC2 Elastic IP를 가리키고, Proxy status가 `DNS only`인지 확인해야 합니다. Let's Encrypt가 인터넷의 `80` 포트로 ACME 검증 파일에 접근할 수 있어야 하기 때문입니다.
+
+처음에는 `nginx/00-http.conf`만 활성화해 HTTP `80` 포트의 ACME 검증 경로를 제공합니다. Certbot이 `/.well-known/acme-challenge/`에 임시 파일을 만들고, Let's Encrypt가 이를 읽어 `api.myenglishvocab.com`의 소유권을 확인합니다.
+
+인증서가 발급되기 전에는 `nginx/10-https.conf.disabled`가 비활성 상태여야 합니다. 인증서 발급 후 확장자 `.disabled`를 제거해 `10-https.conf`로 바꾸면 Nginx가 TLS 설정과 역방향 프록시 설정을 읽습니다.
+
+운영 컨테이너 시작과 인증서 발급은 다음 순서로 진행합니다.
+
+```bash
+# Nginx(HTTP), Spring Boot, PostgreSQL, Redis 시작
+sudo docker compose --env-file .env.production -f docker-compose.prod.yml up --build -d
+
+# api.myenglishvocab.com 인증서 발급
+sudo docker compose --env-file .env.production -f docker-compose.prod.yml run --rm certbot \
+  certonly --webroot -w /var/www/certbot \
+  --email you@example.com --agree-tos --no-eff-email \
+  -d api.myenglishvocab.com
+```
+
+인증서 발급 뒤에는 HTTPS 설정 파일의 확장자를 바꾸고 Nginx를 재시작합니다.
+
+```bash
+mv nginx/10-https.conf.disabled nginx/10-https.conf
+sudo docker compose --env-file .env.production -f docker-compose.prod.yml restart nginx
+```
+
+인증서는 만료 전 주기적으로 갱신해야 합니다. 갱신 명령과 자동화는 실제 HTTPS 동작을 확인한 뒤 설정합니다.
+
+> 이 구성은 실제 AWS 배포 전 준비가 된 상태입니다. 실제 도메인 DNS, EC2 환경 변수, HTTPS 발급과 Smoke Test가 끝나기 전까지는 운영 배포 완료로 간주하지 않습니다.
+
 ### 4) 테스트
 ```bash
 ./gradlew test --rerun-tasks

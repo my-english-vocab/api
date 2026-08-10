@@ -41,5 +41,6 @@ out/
 
 # Local secrets / overrides
 .env
+.env.production
 application-local.yaml
 application-local.yml
