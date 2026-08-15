@@ -1,0 +1,6 @@
+# EC2 서버 시간은 UTC입니다.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# 매일 18:00 UTC = 다음 날 03:00 KST
+0 18 * * * root /usr/local/sbin/myenglishvocab-postgres-backup >> /var/log/myenglishvocab-postgres-backup.log 2>&1
