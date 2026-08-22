@@ -416,10 +416,11 @@ Swagger의 HTTP Bearer 보안 방식은 `Authorization: Bearer {accessToken}` �
 |---|---|---|
 | `GET` | `/api/words` | 내 단어 목록 (저장 순서) |
 | `GET` | `/api/words/{id}` | 내 단어 단건 조회 |
-| `POST` | `/api/words` | 단어 추가 (level은 서버에서 0으로 시작) |
+| `POST` | `/api/words` | 단어 추가 (level은 0, favorite은 false로 시작) |
 | `PUT` | `/api/words/{id}` | 단어 내용 수정 (level 변경 불가) |
 | `DELETE` | `/api/words/{id}` | 단어 삭제 |
 | `POST` | `/api/words/{id}/mark-learned` | 외웠음 처리 (level + 1) |
+| `PATCH` | `/api/words/{id}/favorite` | 즐겨찾기 상태 변경 |
 | `POST` | `/api/words/generate-example` | AI로 뜻·예문·해석 생성 (저장하지 않음) |
 
 ### 단어 생성 예시
@@ -433,6 +434,17 @@ curl -X POST http://localhost:8080/api/words \
     "exampleSentence": "I like apples.",
     "meaningOfExampleSentence": "나는 사과를 좋아한다."
   }'
+```
+
+### 즐겨찾기 변경 예시
+
+현재 상태를 반대로 뒤집는 toggle 요청이 아니라 원하는 상태를 명시합니다. 같은 요청을 다시 보내도 결과가 달라지지 않습니다.
+
+```bash
+curl -X PATCH http://localhost:8080/api/words/{id}/favorite \
+  -H "Authorization: Bearer {accessToken}" \
+  -H "Content-Type: application/json" \
+  -d '{ "favorite": true }'
 ```
 
 ### 퀴즈와의 역할 분리

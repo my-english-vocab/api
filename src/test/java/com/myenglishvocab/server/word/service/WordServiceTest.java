@@ -5,6 +5,7 @@ import com.myenglishvocab.server.common.exception.ErrorCode;
 import com.myenglishvocab.server.user.entity.User;
 import com.myenglishvocab.server.user.repository.UserRepository;
 import com.myenglishvocab.server.word.dto.CreateWordRequest;
+import com.myenglishvocab.server.word.dto.UpdateFavoriteRequest;
 import com.myenglishvocab.server.word.dto.UpdateWordRequest;
 import com.myenglishvocab.server.word.dto.WordResponse;
 import com.myenglishvocab.server.word.entity.Word;
@@ -34,7 +35,7 @@ class WordServiceTest {
     @InjectMocks WordService wordService;
 
     @Test
-    void 단어_생성_성공시_level은_0이다() {
+    void 단어_생성_성공시_level은_0이고_즐겨찾기는_false다() {
         User user = user(1L);
         given(userRepository.findById(1L)).willReturn(Optional.of(user));
         given(wordRepository.save(any(Word.class))).willAnswer(invocation -> {
@@ -52,6 +53,7 @@ class WordServiceTest {
         assertThat(response.term()).isEqualTo("apple");
         assertThat(response.definition()).isEqualTo("사과");
         assertThat(response.level()).isZero();
+        assertThat(response.favorite()).isFalse();
         verify(wordRepository).save(any(Word.class));
     }
 
@@ -134,6 +136,39 @@ class WordServiceTest {
         WordResponse response = wordService.markLearned(1L, 1L);
 
         assertThat(response.level()).isEqualTo(1);
+    }
+
+    @Test
+    void 즐겨찾기_상태_변경_성공() {
+        User user = user(1L);
+        Word word = word(user, "apple", "사과");
+        ReflectionTestUtils.setField(word, "id", 1L);
+        ReflectionTestUtils.setField(word, "createdAt", Instant.parse("2026-07-29T00:00:00Z"));
+
+        given(wordRepository.findByIdAndUserId(1L, 1L)).willReturn(Optional.of(word));
+
+        WordResponse response = wordService.updateFavorite(
+                1L,
+                1L,
+                new UpdateFavoriteRequest(true)
+        );
+
+        assertThat(response.favorite()).isTrue();
+        assertThat(word.isFavorite()).isTrue();
+    }
+
+    @Test
+    void 소유하지_않은_단어는_즐겨찾기_변경_실패() {
+        given(wordRepository.findByIdAndUserId(1L, 2L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> wordService.updateFavorite(
+                2L,
+                1L,
+                new UpdateFavoriteRequest(true)
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.WORD_NOT_FOUND);
     }
 
     private User user(Long id) {

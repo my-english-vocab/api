@@ -12,6 +12,7 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -44,6 +45,7 @@ class WordApiTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.term").value("apple"))
                 .andExpect(jsonPath("$.level").value(0))
+                .andExpect(jsonPath("$.favorite").value(false))
                 .andReturn();
 
         int wordId = JsonPath.read(createResult.getResponse().getContentAsString(), "$.id");
@@ -73,6 +75,22 @@ class WordApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.definition").value("사과(수정)"))
                 .andExpect(jsonPath("$.level").value(0));
+
+        mockMvc.perform(patch("/api/words/" + wordId + "/favorite")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "favorite": true
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.favorite").value(true));
+
+        mockMvc.perform(get("/api/words/" + wordId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.favorite").value(true));
 
         mockMvc.perform(post("/api/words/" + wordId + "/mark-learned")
                         .header("Authorization", "Bearer " + token))
@@ -128,6 +146,17 @@ class WordApiTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("WORD_NOT_FOUND"));
 
+        mockMvc.perform(patch("/api/words/" + wordId + "/favorite")
+                        .header("Authorization", "Bearer " + otherToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "favorite": true
+                                }
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("WORD_NOT_FOUND"));
+
         mockMvc.perform(delete("/api/words/" + wordId)
                         .header("Authorization", "Bearer " + otherToken))
                 .andExpect(status().isNotFound())
@@ -153,6 +182,32 @@ class WordApiTest {
                                   "definition": "사과"
                                 }
                                 """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON_INVALID_INPUT"));
+    }
+
+    @Test
+    void 즐겨찾기_값이_누락되면_400_표준_에러응답() throws Exception {
+        String token = signupAndLogin("fv_" + System.currentTimeMillis() % 1_000_000_000L);
+
+        MvcResult createResult = mockMvc.perform(post("/api/words")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "term": "apple",
+                                  "definition": "사과"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        int wordId = JsonPath.read(createResult.getResponse().getContentAsString(), "$.id");
+
+        mockMvc.perform(patch("/api/words/" + wordId + "/favorite")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COMMON_INVALID_INPUT"));
     }
