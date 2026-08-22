@@ -9,6 +9,7 @@ public record WordResponse(
         String term,
         String definition,
         int level,
+        boolean favorite,
         String exampleSentence,
         String meaningOfExampleSentence,
         Instant createdAt
@@ -19,6 +20,7 @@ public record WordResponse(
                 word.getTerm(),
                 word.getDefinition(),
                 word.getLevel(),
+                word.isFavorite(),
                 word.getExampleSentence(),
                 word.getMeaningOfExampleSentence(),
                 word.getCreatedAt()
