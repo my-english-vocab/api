@@ -3,7 +3,7 @@
 Spring Boot 기반 영어 단어장 API 서버입니다.  
 JWT Access Token + Redis Refresh Token 인증, 사용자별 단어장 API, AI 예문 생성, 표준 에러 응답을 적용했습니다.
 
-현재 로컬에서는 Docker Compose로 백엔드·PostgreSQL·Redis를 함께 실행할 수 있으며, Health Check와 전체 백엔드 테스트까지 검증한 상태입니다. 실제 운영 환경에는 아직 배포하지 않았습니다.
+로컬에서는 Docker Compose로 백엔드·PostgreSQL·Redis를 함께 실행할 수 있습니다. 운영 환경은 AWS EC2에서 Nginx·Spring Boot·PostgreSQL·Redis를 `docker-compose.prod.yml`로 실행하며, HTTPS와 내부·외부 Health Check를 적용했습니다.
 
 ## Tech Stack
 - Java 21, Spring Boot 4
@@ -176,11 +176,23 @@ docker compose down
 docker compose down -v
 ```
 
-## 실제 운영 Compose 준비
+## 운영 배포
 
 로컬용 `docker-compose.yml`은 학습과 통합 실행을 위해 PostgreSQL, Redis, Spring Boot 포트를 호스트에 공개합니다. 실제 EC2에서는 이를 사용하지 않고 `docker-compose.prod.yml`을 사용합니다.
 
 운영 Compose는 Nginx만 `80`, `443` 포트를 공개합니다. PostgreSQL(`5432`), Redis(`6379`), Spring Boot(`8080`)는 Docker 내부 네트워크에만 두고, Nginx가 HTTPS 요청을 `app:8080`으로 전달합니다.
+
+### 현재 운영 상태
+
+- 프론트엔드: Vercel (`https://app.myenglishvocab.com`)
+- 백엔드: AWS EC2 (`https://api.myenglishvocab.com`)
+- 실행 구성: Nginx, Spring Boot, PostgreSQL, Redis
+- 공개 포트: `80`, `443`만 사용
+- HTTPS: Let's Encrypt 인증서와 Certbot 자동 갱신 적용
+- 데이터 보호: PostgreSQL·Redis named Volume 유지, PostgreSQL 정기 백업 적용
+- 배포 방식: 현재 EC2에서 Git 변경 사항을 받은 뒤 운영 Compose를 다시 빌드·실행하는 수동 배포
+
+GitHub Actions를 이용한 백엔드 자동 배포는 아직 적용 전입니다. 자동 배포에서도 운영 비밀값은 EC2의 `.env.production`에 유지하고, PostgreSQL·Redis Volume을 삭제하지 않는 방식을 사용합니다.
 
 ### 운영 환경 변수
 
@@ -221,9 +233,42 @@ mv nginx/10-https.conf.disabled nginx/10-https.conf
 sudo docker compose --env-file .env.production -f docker-compose.prod.yml restart nginx
 ```
 
-인증서는 만료 전 주기적으로 갱신해야 합니다. 갱신 명령과 자동화는 실제 HTTPS 동작을 확인한 뒤 설정합니다.
+인증서는 Certbot과 Cron으로 자동 갱신하며, `certbot renew --dry-run`으로 갱신 절차를 검증했습니다.
 
-> 이 구성은 실제 AWS 배포 전 준비가 된 상태입니다. 실제 도메인 DNS, EC2 환경 변수, HTTPS 발급과 Smoke Test가 끝나기 전까지는 운영 배포 완료로 간주하지 않습니다.
+### 현재 수동 배포 흐름
+
+EC2의 백엔드 저장소에서 아래 순서로 배포합니다.
+
+```bash
+git pull --ff-only origin main
+
+sudo docker compose \
+  --env-file .env.production \
+  -f docker-compose.prod.yml \
+  up --build -d
+```
+
+`git pull --ff-only`는 원격 `main`과 선형으로 이어질 때만 변경 사항을 받습니다. EC2에 예상하지 못한 로컬 커밋이 있으면 자동으로 합치지 않고 실패하므로 운영 저장소의 변경을 조기에 발견할 수 있습니다.
+
+`up --build -d`는 애플리케이션 이미지를 다시 빌드하고 필요한 컨테이너를 갱신하지만 named Volume은 삭제하지 않습니다. 운영 데이터가 들어 있는 `postgres-prod-data`, `redis-prod-data`를 보호하기 위해 운영에서는 `docker compose down -v`를 실행하지 않습니다.
+
+배포 후 컨테이너 상태와 내부 Health Check를 확인합니다. Spring Boot의 `8080` 포트는 호스트에 공개하지 않았으므로 내부 확인은 `app` 컨테이너 안에서 실행합니다.
+
+```bash
+sudo docker compose \
+  --env-file .env.production \
+  -f docker-compose.prod.yml \
+  ps
+
+sudo docker compose \
+  --env-file .env.production \
+  -f docker-compose.prod.yml \
+  exec app curl -fsS http://localhost:8080/actuator/health
+
+curl -fsS https://api.myenglishvocab.com/actuator/health
+```
+
+정상 응답에는 `"status":"UP"`이 포함됩니다.
 
 ### 4) 테스트
 ```bash
@@ -316,6 +361,8 @@ GitHub Actions가 `main`에 대한 push와 pull request마다 테스트를 실�
 - Redis는 테스트 프로필에서 InMemory Store를 쓰므로 CI에 Redis가 필요하지 않습니다.
 
 PR 페이지의 **Checks / Actions** 탭에서 결과를 확인할 수 있습니다.
+
+현재 GitHub Actions는 CI까지만 담당하며, `main` Merge 후 EC2에 배포하는 CD는 아직 없습니다. 다음 단계에서는 GitHub OIDC로 AWS 임시 권한을 얻고 Systems Manager Run Command로 위 수동 배포 명령을 실행하도록 구성합니다. SSH `22`번 포트를 GitHub Actions에 공개하거나 EC2를 self-hosted runner로 사용하지 않습니다.
 
 ## DB 마이그레이션 (Flyway)
 
