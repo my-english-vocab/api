@@ -28,7 +28,10 @@ compose() {
 
 cd "$PROJECT_DIR"
 
-commit_sha="$(git rev-parse --short HEAD)"
+commit_sha="$(
+  runuser -u ubuntu -- \
+    git -C "$PROJECT_DIR" rev-parse --short HEAD
+)"
 printf 'Deploying commit: %s\n' "$commit_sha"
 
 printf 'Validating production Compose configuration\n'
