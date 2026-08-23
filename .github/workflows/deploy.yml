@@ -11,13 +11,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  verify-aws-oidc:
-    name: Verify AWS OIDC
+  deploy:
+    name: Deploy to EC2
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 40
 
     steps:
       - name: Configure AWS credentials
+        id: aws_auth
         uses: aws-actions/configure-aws-credentials@v6.2.3
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
@@ -28,3 +29,190 @@ jobs:
 
       - name: Verify caller identity
         run: aws sts get-caller-identity
+
+      - name: Send deployment command
+        id: send_deploy
+        env:
+          INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+          DEPLOY_PARAMETERS: >-
+            {"commands":["#!/usr/bin/env bash","set -Eeuo pipefail","runuser -u ubuntu -- git -C /home/ubuntu/myenglishvocab-api diff --quiet","runuser -u ubuntu -- git -C /home/ubuntu/myenglishvocab-api diff --cached --quiet","runuser -u ubuntu -- git -C /home/ubuntu/myenglishvocab-api switch main","runuser -u ubuntu -- git -C /home/ubuntu/myenglishvocab-api pull --ff-only origin main","bash /home/ubuntu/myenglishvocab-api/ops/deploy-production.sh"],"executionTimeout":["1800"]}
+        run: |
+          set -Eeuo pipefail
+
+          command_id="$(
+            aws ssm send-command \
+              --instance-ids "$INSTANCE_ID" \
+              --document-name "AWS-RunShellScript" \
+              --comment "GitHub Actions backend deploy ${GITHUB_RUN_ID}" \
+              --parameters "$DEPLOY_PARAMETERS" \
+              --timeout-seconds 600 \
+              --query 'Command.CommandId' \
+              --output text
+          )"
+
+          if [[ -z "$command_id" || "$command_id" == "None" ]]; then
+            printf 'SSM did not return a command ID\n' >&2
+            exit 1
+          fi
+
+          printf 'SSM command ID: %s\n' "$command_id"
+          printf 'command_id=%s\n' "$command_id" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for deployment command
+        env:
+          INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+          COMMAND_ID: ${{ steps.send_deploy.outputs.command_id }}
+        run: |
+          set -Eeuo pipefail
+
+          status="Pending"
+          terminal_status_reached="false"
+
+          for attempt in $(seq 1 180); do
+            status="$(
+              aws ssm get-command-invocation \
+                --command-id "$COMMAND_ID" \
+                --instance-id "$INSTANCE_ID" \
+                --query 'Status' \
+                --output text \
+                2>/dev/null || printf 'Pending'
+            )"
+
+            if [[ -z "$status" || "$status" == "None" ]]; then
+              status="Pending"
+            fi
+
+            printf 'SSM status attempt %d/180: %s\n' \
+              "$attempt" \
+              "$status"
+
+            case "$status" in
+              Success|Cancelled|TimedOut|Failed)
+                terminal_status_reached="true"
+                break
+                ;;
+            esac
+
+            sleep 10
+          done
+
+          if [[ "$terminal_status_reached" != "true" ]]; then
+            printf 'Timed out while waiting for the SSM command\n' >&2
+            exit 1
+          fi
+
+          echo '::group::SSM standard output'
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID" \
+            --query 'StandardOutputContent' \
+            --output text
+          echo '::endgroup::'
+
+          echo '::group::SSM standard error'
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID" \
+            --query 'StandardErrorContent' \
+            --output text
+          echo '::endgroup::'
+
+          if [[ "$status" != "Success" ]]; then
+            printf 'Deployment command failed with status: %s\n' \
+              "$status" >&2
+            exit 1
+          fi
+
+      - name: Check external health endpoint
+        env:
+          HEALTH_URL: https://api.myenglishvocab.com/actuator/health
+        run: |
+          set -Eeuo pipefail
+
+          response="$(
+            curl \
+              --fail \
+              --silent \
+              --show-error \
+              --retry 12 \
+              --retry-all-errors \
+              --retry-delay 5 \
+              --connect-timeout 5 \
+              --max-time 10 \
+              "$HEALTH_URL"
+          )"
+
+          printf 'External health response: %s\n' "$response"
+
+          printf '%s\n' "$response" |
+            jq -e '.status == "UP"' >/dev/null
+
+          printf 'External health check succeeded\n'
+
+      - name: Collect Docker logs on failure
+        if: failure() && steps.aws_auth.outcome == 'success'
+        env:
+          INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+          LOG_PARAMETERS: >-
+            {"commands":["#!/usr/bin/env bash","set +e","docker compose --env-file /home/ubuntu/myenglishvocab-api/.env.production -f /home/ubuntu/myenglishvocab-api/docker-compose.prod.yml ps","docker compose --env-file /home/ubuntu/myenglishvocab-api/.env.production -f /home/ubuntu/myenglishvocab-api/docker-compose.prod.yml logs --no-color --tail=120 app nginx","exit 0"],"executionTimeout":["300"]}
+        run: |
+          set +e
+
+          log_command_id="$(
+            aws ssm send-command \
+              --instance-ids "$INSTANCE_ID" \
+              --document-name "AWS-RunShellScript" \
+              --comment "Collect backend deployment failure logs ${GITHUB_RUN_ID}" \
+              --parameters "$LOG_PARAMETERS" \
+              --timeout-seconds 120 \
+              --query 'Command.CommandId' \
+              --output text
+          )"
+
+          send_status=$?
+
+          if [[ "$send_status" -ne 0 ||
+                -z "$log_command_id" ||
+                "$log_command_id" == "None" ]]; then
+            printf 'Could not send the Docker log collection command\n' >&2
+            exit 0
+          fi
+
+          printf 'Docker log command ID: %s\n' "$log_command_id"
+
+          for attempt in $(seq 1 30); do
+            log_status="$(
+              aws ssm get-command-invocation \
+                --command-id "$log_command_id" \
+                --instance-id "$INSTANCE_ID" \
+                --query 'Status' \
+                --output text \
+                2>/dev/null
+            )"
+
+            case "$log_status" in
+              Success|Cancelled|TimedOut|Failed)
+                break
+                ;;
+            esac
+
+            sleep 5
+          done
+
+          echo '::group::Docker status and logs'
+          aws ssm get-command-invocation \
+            --command-id "$log_command_id" \
+            --instance-id "$INSTANCE_ID" \
+            --query 'StandardOutputContent' \
+            --output text
+          echo '::endgroup::'
+
+          echo '::group::Docker log collection errors'
+          aws ssm get-command-invocation \
+            --command-id "$log_command_id" \
+            --instance-id "$INSTANCE_ID" \
+            --query 'StandardErrorContent' \
+            --output text
+          echo '::endgroup::'
+
+          exit 0
