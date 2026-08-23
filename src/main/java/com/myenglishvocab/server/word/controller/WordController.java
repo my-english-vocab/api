@@ -6,6 +6,7 @@ import com.myenglishvocab.server.ai.service.ExampleGenerationService;
 import com.myenglishvocab.server.auth.jwt.JwtPrincipal;
 import com.myenglishvocab.server.common.exception.ErrorResponse;
 import com.myenglishvocab.server.word.dto.CreateWordRequest;
+import com.myenglishvocab.server.word.dto.UpdateFavoriteRequest;
 import com.myenglishvocab.server.word.dto.UpdateWordRequest;
 import com.myenglishvocab.server.word.dto.WordResponse;
 import com.myenglishvocab.server.word.service.WordService;
@@ -24,7 +25,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@Tag(name = "Words", description = "내 단어장 CRUD 및 학습(레벨) API")
+@Tag(name = "Words", description = "내 단어장 CRUD, 즐겨찾기 및 학습(레벨) API")
 @RestController
 @RequestMapping("/api/words")
 @RequiredArgsConstructor
@@ -115,6 +116,26 @@ public class WordController {
             @PathVariable Long id
     ) {
         return ResponseEntity.ok(wordService.markLearned(principal.userId(), id));
+    }
+
+    @Operation(
+            summary = "즐겨찾기 상태 변경",
+            description = "favorite 값으로 내 단어의 즐겨찾기 상태를 설정합니다. 같은 값을 다시 요청해도 결과는 동일합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "즐겨찾기 상태 변경 성공"),
+            @ApiResponse(responseCode = "400", description = "favorite 누락 또는 입력값 검증 실패",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "단어 없음 또는 소유자 아님",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    @PatchMapping("/{id}/favorite")
+    public ResponseEntity<WordResponse> updateFavorite(
+            @AuthenticationPrincipal JwtPrincipal principal,
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateFavoriteRequest request
+    ) {
+        return ResponseEntity.ok(wordService.updateFavorite(principal.userId(), id, request));
     }
 
     @Operation(

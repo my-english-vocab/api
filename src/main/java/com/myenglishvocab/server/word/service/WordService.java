@@ -5,6 +5,7 @@ import com.myenglishvocab.server.common.exception.ErrorCode;
 import com.myenglishvocab.server.user.entity.User;
 import com.myenglishvocab.server.user.repository.UserRepository;
 import com.myenglishvocab.server.word.dto.CreateWordRequest;
+import com.myenglishvocab.server.word.dto.UpdateFavoriteRequest;
 import com.myenglishvocab.server.word.dto.UpdateWordRequest;
 import com.myenglishvocab.server.word.dto.WordResponse;
 import com.myenglishvocab.server.word.entity.Word;
@@ -81,6 +82,14 @@ public class WordService {
         Word word = getOwnedWord(wordId, userId);
         word.markLearned();
         log.info("단어 레벨업 userId={} wordId={} term={} level={}", userId, wordId, word.getTerm(), word.getLevel());
+        return WordResponse.from(word);
+    }
+
+    @Transactional
+    public WordResponse updateFavorite(Long userId, Long wordId, UpdateFavoriteRequest request) {
+        Word word = getOwnedWord(wordId, userId);
+        word.changeFavorite(request.favorite());
+        log.info("단어 즐겨찾기 변경 userId={} wordId={} favorite={}", userId, wordId, word.isFavorite());
         return WordResponse.from(word);
     }
 

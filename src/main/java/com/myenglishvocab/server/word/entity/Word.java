@@ -32,6 +32,9 @@ public class Word {
     @Column(nullable = false)
     private int level;
 
+    @Column(nullable = false)
+    private boolean favorite;
+
     @Column(length = 1000)
     private String exampleSentence;
 
@@ -56,6 +59,7 @@ public class Word {
         this.term = term;
         this.definition = definition;
         this.level = 0;
+        this.favorite = false;
         this.exampleSentence = exampleSentence;
         this.meaningOfExampleSentence = meaningOfExampleSentence;
     }
@@ -86,5 +90,9 @@ public class Word {
 
     public void markLearned() {
         this.level += 1;
+    }
+
+    public void changeFavorite(boolean favorite) {
+        this.favorite = favorite;
     }
 }
