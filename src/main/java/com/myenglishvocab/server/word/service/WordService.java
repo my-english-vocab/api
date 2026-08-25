@@ -1,5 +1,7 @@
 package com.myenglishvocab.server.word.service;
 
+import com.myenglishvocab.server.analytics.entity.ActivityType;
+import com.myenglishvocab.server.analytics.service.ActivityService;
 import com.myenglishvocab.server.common.exception.BusinessException;
 import com.myenglishvocab.server.common.exception.ErrorCode;
 import com.myenglishvocab.server.user.entity.User;
@@ -16,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.time.Instant;
 
 @Slf4j
 @Service
@@ -24,6 +27,7 @@ public class WordService {
 
     private final WordRepository wordRepository;
     private final UserRepository userRepository;
+    private final ActivityService activityService;
 
     @Transactional(readOnly = true)
     public List<WordResponse> getMyWords(Long userId) {
@@ -51,6 +55,7 @@ public class WordService {
                 .build();
 
         Word saved = wordRepository.save(word);
+        activityService.record(user, ActivityType.WORD_CREATED, null, Instant.now());
         log.info("단어 생성 userId={} wordId={} term={}", userId, saved.getId(), saved.getTerm());
         return WordResponse.from(saved);
     }

@@ -1,5 +1,7 @@
 package com.myenglishvocab.server.ai.service;
 
+import com.myenglishvocab.server.analytics.entity.ActivityType;
+import com.myenglishvocab.server.analytics.service.ActivityService;
 import com.myenglishvocab.server.ai.ExampleGenerator;
 import com.myenglishvocab.server.ai.dto.ExamplePair;
 import com.myenglishvocab.server.ai.dto.GenerateExampleRequest;
@@ -19,9 +21,11 @@ public class ExampleGenerationService {
     private final ExampleGenerator exampleGenerator;
     private final Translator translator;
     private final AiUsageLimiter aiUsageLimiter;
+    private final ActivityService activityService;
 
     public GenerateExampleResponse generate(Long userId, GenerateExampleRequest request) {
         aiUsageLimiter.consume(userId);
+        activityService.record(userId, ActivityType.AI_GENERATION_REQUESTED);
 
         String term = request.term().trim();
         String definition = resolveDefinition(term, request.definition());

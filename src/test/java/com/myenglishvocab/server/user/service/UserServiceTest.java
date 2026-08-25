@@ -1,5 +1,7 @@
 package com.myenglishvocab.server.user.service;
 
+import com.myenglishvocab.server.analytics.repository.AccountLifecycleEventRepository;
+import com.myenglishvocab.server.analytics.service.ActivityService;
 import com.myenglishvocab.server.auth.jwt.JwtTokenProvider;
 import com.myenglishvocab.server.auth.token.RefreshTokenStore;
 import com.myenglishvocab.server.common.exception.BusinessException;
@@ -12,7 +14,9 @@ import com.myenglishvocab.server.user.dto.RefreshSession;
 import com.myenglishvocab.server.user.dto.SignupRequest;
 import com.myenglishvocab.server.user.dto.TokenResponse;
 import com.myenglishvocab.server.user.entity.User;
+import com.myenglishvocab.server.quiz.repository.QuizSetAttemptRepository;
 import com.myenglishvocab.server.user.repository.UserRepository;
+import com.myenglishvocab.server.word.repository.WordRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -42,11 +46,20 @@ class UserServiceTest {
     @Mock JwtTokenProvider jwtTokenProvider;
     @Mock RefreshTokenStore refreshTokenStore;
     @Mock JwtProperties jwtProperties;
+    @Mock ActivityService activityService;
+    @Mock AccountLifecycleEventRepository lifecycleEventRepository;
+    @Mock WordRepository wordRepository;
+    @Mock QuizSetAttemptRepository quizSetAttemptRepository;
     @InjectMocks UserService userService;
 
     @Test
     void 중복_username이면_회원가입_실패() {
-        given(userRepository.existsByUsername("hyungyu")).willReturn(true);
+        User existing = User.builder()
+                .username("hyungyu")
+                .password("encoded")
+                .displayName("현규")
+                .build();
+        given(userRepository.findByUsername("hyungyu")).willReturn(Optional.of(existing));
 
         assertThatThrownBy(() -> userService.signup(
                 new SignupRequest("hyungyu", "password1", "현규")
@@ -95,6 +108,7 @@ class UserServiceTest {
         assertThat(response.userId()).isEqualTo(1L);
         assertThat(response.username()).isEqualTo("hyungyu");
         assertThat(response.displayName()).isEqualTo("현규");
+        assertThat(response.role()).isEqualTo(com.myenglishvocab.server.user.entity.UserRole.USER);
         assertThat(response.accessToken()).isEqualTo("test-access-token");
         assertThat(response.tokenType()).isEqualTo("Bearer");
         assertThat(session.refreshToken()).isNotBlank();
@@ -111,7 +125,7 @@ class UserServiceTest {
 
     @Test
     void 회원가입_성공시_비밀번호를_해싱해서_저장한다() {
-        given(userRepository.existsByUsername("hyungyu")).willReturn(false);
+        given(userRepository.findByUsername("hyungyu")).willReturn(Optional.empty());
         given(passwordEncoder.encode("password1")).willReturn("hashed");
         given(userRepository.save(any(User.class))).willAnswer(invocation -> invocation.getArgument(0));
 

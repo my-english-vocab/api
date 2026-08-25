@@ -13,6 +13,11 @@ public interface QuizSetAttemptRepository extends JpaRepository<QuizSetAttempt, 
 
     Optional<QuizSetAttempt> findByUserIdAndAttemptId(Long userId, UUID attemptId);
 
+    void deleteByUserId(Long userId);
+
+    @Query("SELECT COUNT(DISTINCT attempt.user.id) FROM QuizSetAttempt attempt")
+    long countDistinctUsers();
+
     @Query("""
             SELECT new com.myenglishvocab.server.quiz.dto.QuizSetAttemptSummaryResponse(
                 attempt.setNumber,

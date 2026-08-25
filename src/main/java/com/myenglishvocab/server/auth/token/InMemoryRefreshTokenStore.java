@@ -28,4 +28,9 @@ public class InMemoryRefreshTokenStore implements RefreshTokenStore {
     public void delete(String refreshToken) {
         store.remove(refreshToken);
     }
+
+    @Override
+    public void deleteAllByUserId(Long userId) {
+        store.entrySet().removeIf(entry -> entry.getValue().equals(userId));
+    }
 }
