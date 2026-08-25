@@ -15,13 +15,24 @@
 
 ## 최초 관리자 지정
 
-애플리케이션 코드에는 관리자 사용자명을 하드코딩하지 않는다. 배포 후 운영자가 정확한 계정을 확인하고 한 계정만 승격한다.
+애플리케이션 코드에는 관리자 사용자명을 하드코딩하지 않는다. 관리자도 운영 프런트에서 일반 회원가입으로 먼저 생성한 뒤, 운영자가 정확한 계정 한 개의 역할만 승격한다. 사용자를 SQL로 직접 생성하면 비밀번호 암호화와 가입 이력이 누락되므로 사용하지 않는다.
 
 실행 위치: EC2의 백엔드 저장소
 
 ```bash
 cd /home/ubuntu/myenglishvocab-api
 
+git status --short
+
+sudo docker compose \
+  --env-file .env.production \
+  -f docker-compose.prod.yml \
+  ps
+```
+
+작업 트리가 깨끗하고 애플리케이션·PostgreSQL·Redis가 정상 상태일 때만 진행한다. PostgreSQL 컨테이너로 들어간다.
+
+```bash
 sudo docker compose \
   --env-file .env.production \
   -f docker-compose.prod.yml \
@@ -34,29 +45,37 @@ sudo docker compose \
 psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"
 ```
 
-먼저 후보 계정을 조회한다. `password` 컬럼은 조회하지 않는다.
+먼저 `V5` 적용과 후보 계정을 읽기 전용으로 확인한다. `password` 컬럼은 조회하지 않으며 `<ADMIN_USERNAME>`을 실제 대상 username으로 바꾼다.
 
 ```sql
-SELECT id, username, display_name, role, status
-FROM users
-ORDER BY id;
+SELECT version, description, success
+FROM flyway_schema_history
+WHERE version = '5';
 ```
 
-`<ADMIN_USERNAME>`을 실제 관리자 계정으로 바꾼 뒤 실행한다.
+```sql
+SELECT id, username, display_name, role, status, created_at, last_login_at
+FROM users
+WHERE username = '<ADMIN_USERNAME>';
+```
+
+마이그레이션이 `success = true`이고 대상이 정확히 한 행이며 `USER`, `ACTIVE`일 때만 진행한다. 조회된 ID와 username을 모두 조건에 넣어 다른 계정이 변경되지 않게 한다.
 
 ```sql
 BEGIN;
 
 UPDATE users
 SET role = 'ADMIN'
-WHERE username = '<ADMIN_USERNAME>'
+WHERE id = <ADMIN_ID>
+  AND username = '<ADMIN_USERNAME>'
+  AND role = 'USER'
   AND status = 'ACTIVE'
-RETURNING id, username, role, status;
+RETURNING id, username, display_name, role, status;
 ```
 
-반환 행이 정확히 1개면 `COMMIT;`, 아니면 `ROLLBACK;`한다. 역할은 다음 인증 요청부터 서버에서 확인하며, 프런트도 앱을 새로 열거나 새로고침할 때 `/api/auth/me`로 현재 역할을 동기화한다.
+반환 행이 정확히 한 개이고 `ADMIN`, `ACTIVE`이면 `COMMIT;`, 행이 없거나 예상과 다르면 `ROLLBACK;`한다. 역할은 다음 인증 요청부터 서버에서 확인하며, 프런트도 앱을 새로 열거나 새로고침할 때 `/api/auth/me`로 현재 역할을 동기화한다. 메뉴가 바로 나타나지 않으면 로그아웃 후 다시 로그인한다.
 
-관리자 권한을 회수할 때는 같은 방식으로 `role = 'USER'`로 변경한다.
+관리자 권한을 회수할 때도 ID와 username을 함께 확인하고 `ADMIN`, `ACTIVE`인 정확한 한 계정만 `USER`로 변경한다. 운영 문서에는 실제 관리자 username, 사용자 ID, 토큰과 조회 결과를 기록하지 않는다.
 
 ## 관리자 대시보드
 

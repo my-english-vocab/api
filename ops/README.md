@@ -6,6 +6,8 @@
 - `postgres-backup.cron`: EC2 Cron 등록 원본이다.
 - 실제 백업 파일, 로그 파일, `.env.production`은 Git에 저장하지 않는다.
 
+관리자 지정, 통계 기준과 관리자 API 운영 방법은 [`admin-statistics.md`](admin-statistics.md)를 참고한다.
+
 ## EC2 설치
 
 PR을 병합한 뒤 EC2에서 최신 코드를 받은 다음 실행한다.
