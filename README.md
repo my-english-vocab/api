@@ -15,7 +15,7 @@ JWT Access Token + Redis Refresh Token 인증, 사용자별 단어장 API, AI �
 - SpringDoc OpenAPI
 - Spring Boot Actuator (Health Check)
 - Docker · Docker Compose (백엔드, Redis, PostgreSQL)
-- GitHub Actions CI (PR/`main` push 시 `./gradlew test`)
+- GitHub Actions CI/CD (PR/`main` 테스트, `main` Merge 후 EC2 자동 배포)
 - 관리자 역할, 가입·로그인·활동 이력과 운영 통계 API
 
 관리자 통계의 지표 정의, 최초 관리자 지정, API 목록과 개인정보 경계는 [`ops/admin-statistics.md`](ops/admin-statistics.md)에 정리했습니다.
@@ -193,9 +193,9 @@ docker compose down -v
 - 공개 포트: `80`, `443`만 사용
 - HTTPS: Let's Encrypt 인증서와 Certbot 자동 갱신 적용
 - 데이터 보호: PostgreSQL·Redis named Volume 유지, PostgreSQL 정기 백업 적용
-- 배포 방식: 현재 EC2에서 Git 변경 사항을 받은 뒤 운영 Compose를 다시 빌드·실행하는 수동 배포
+- 배포 방식: GitHub OIDC와 AWS Systems Manager Run Command를 이용한 GitHub Actions 자동 배포
 
-GitHub Actions를 이용한 백엔드 자동 배포는 아직 적용 전입니다. 자동 배포에서도 운영 비밀값은 EC2의 `.env.production`에 유지하고, PostgreSQL·Redis Volume을 삭제하지 않는 방식을 사용합니다.
+`main`에 변경이 반영되면 GitHub Actions가 장기 AWS Access Key 없이 OIDC 임시 권한을 얻어 EC2에 SSM 명령을 보냅니다. EC2는 최신 `main`을 받은 뒤 운영 Compose를 다시 빌드하고, 내부·외부 Health Check를 수행합니다. 운영 비밀값은 EC2의 `.env.production`에 유지하며 PostgreSQL·Redis Volume은 삭제하지 않습니다. SSH `22`번 포트를 GitHub Actions에 공개하거나 EC2를 self-hosted runner로 사용하지 않습니다.
 
 ### 운영 환경 변수
 
@@ -214,11 +214,14 @@ Certbot을 실행하기 전에 Cloudflare DNS에서 `api.myenglishvocab.com`의 
 
 처음에는 `nginx/00-http.conf`만 활성화해 HTTP `80` 포트의 ACME 검증 경로를 제공합니다. Certbot이 `/.well-known/acme-challenge/`에 임시 파일을 만들고, Let's Encrypt가 이를 읽어 `api.myenglishvocab.com`의 소유권을 확인합니다.
 
-인증서가 발급되기 전에는 `nginx/10-https.conf.disabled`가 비활성 상태여야 합니다. 인증서 발급 후 확장자 `.disabled`를 제거해 `10-https.conf`로 바꾸면 Nginx가 TLS 설정과 역방향 프록시 설정을 읽습니다.
+저장소에는 현재 운영 중인 `nginx/10-https.conf`가 포함되어 있습니다. 아직 인증서가 없는 새 EC2에서는 이 파일을 잠시 `.disabled`로 바꿔 Nginx가 HTTPS 설정을 읽지 않게 해야 합니다. 인증서 발급 후 원래 이름으로 되돌리면 Nginx가 TLS 설정과 역방향 프록시 설정을 읽습니다. 이미 인증서가 있는 현재 운영 서버에서는 이 초기 비활성화 단계를 다시 실행하지 않습니다.
 
 운영 컨테이너 시작과 인증서 발급은 다음 순서로 진행합니다.
 
 ```bash
+# 새 EC2에서 최초 인증서를 발급할 때만 HTTPS 설정을 잠시 비활성화
+mv nginx/10-https.conf nginx/10-https.conf.disabled
+
 # Nginx(HTTP), Spring Boot, PostgreSQL, Redis 시작
 sudo docker compose --env-file .env.production -f docker-compose.prod.yml up --build -d
 
@@ -229,7 +232,7 @@ sudo docker compose --env-file .env.production -f docker-compose.prod.yml run --
   -d api.myenglishvocab.com
 ```
 
-인증서 발급 뒤에는 HTTPS 설정 파일의 확장자를 바꾸고 Nginx를 재시작합니다.
+인증서 발급 뒤에는 HTTPS 설정 파일을 원래 이름으로 되돌리고 Nginx를 재시작합니다. 이름을 되돌린 뒤 `git status --short`가 비어 있으면 저장소도 다시 깨끗한 상태입니다.
 
 ```bash
 mv nginx/10-https.conf.disabled nginx/10-https.conf
@@ -238,9 +241,9 @@ sudo docker compose --env-file .env.production -f docker-compose.prod.yml restar
 
 인증서는 Certbot과 Cron으로 자동 갱신하며, `certbot renew --dry-run`으로 갱신 절차를 검증했습니다.
 
-### 현재 수동 배포 흐름
+### 수동 재배포와 장애 대응
 
-EC2의 백엔드 저장소에서 아래 순서로 배포합니다.
+자동 배포를 다시 실행할 수 없거나 운영 상태를 직접 점검해야 할 때는 EC2의 백엔드 저장소에서 아래 순서로 수동 재배포할 수 있습니다.
 
 ```bash
 git pull --ff-only origin main
@@ -272,6 +275,34 @@ curl -fsS https://api.myenglishvocab.com/actuator/health
 ```
 
 정상 응답에는 `"status":"UP"`이 포함됩니다.
+
+자동 배포 직후 문제가 생겨 긴급하게 이전 코드를 실행해야 한다면 작업 트리가 깨끗한지 확인한 뒤 이전 Commit을 임시로 Checkout하고 같은 Compose 명령으로 다시 빌드할 수 있습니다.
+
+```bash
+cd /home/ubuntu/myenglishvocab-api
+git status --short
+git log --oneline -5
+git switch --detach <PREVIOUS_COMMIT>
+
+sudo docker compose \
+  --env-file .env.production \
+  -f docker-compose.prod.yml \
+  up --build -d
+```
+
+이 방식은 긴급 복구용이며, 이번 자동 배포 작업에서는 운영 서버를 이전 Commit으로 되돌릴 이유가 없어 끝까지 실행해 검증하지는 않았습니다. 문제를 해결한 뒤에는 문제가 된 Commit을 되돌리는 Revert Pull Request를 `main`에 반영하는 편이 운영 이력을 보존하는 데 안전합니다. EC2를 다시 현재 `main`으로 돌릴 때는 다음 명령을 사용합니다.
+
+```bash
+git switch main
+git pull --ff-only origin main
+
+sudo docker compose \
+  --env-file .env.production \
+  -f docker-compose.prod.yml \
+  up --build -d
+```
+
+DB Migration에 컬럼 삭제나 의미 변경이 포함됐다면 코드만 이전 버전으로 되돌릴 수 있는지 별도로 확인해야 합니다. 복구 과정에서도 PostgreSQL·Redis Volume을 삭제하는 `docker compose down -v`는 사용하지 않습니다.
 
 ### 4) 테스트
 ```bash
@@ -317,16 +348,16 @@ Refresh token은 JavaScript가 읽을 수 없는 httpOnly 쿠키로 저장합니
 | `SameSite` | `Lax` | 같은 site 요청에서만 기본적으로 쿠키 전송 |
 | `Path` | `/api/auth` | refresh·logout 등 인증 API에만 쿠키 전송 |
 
-현재 정책은 프론트와 API가 같은 site에 있는 배포에 맞습니다. 예를 들어 `app.example.com`과 `api.example.com`은 같은 site로 취급됩니다. 프론트는 refresh·logout 요청에 반드시 `credentials: include`를 설정해야 합니다.
+현재 운영 주소인 `app.myenglishvocab.com`과 `api.myenglishvocab.com`은 같은 site로 취급되므로 이 정책과 맞습니다. 프론트는 refresh·logout 요청에 반드시 `credentials: include`를 설정해야 합니다.
 
 ```ts
-fetch("https://api.example.com/api/auth/refresh", {
+fetch("https://api.myenglishvocab.com/api/auth/refresh", {
   method: "POST",
   credentials: "include"
 });
 ```
 
-프론트와 API가 완전히 다른 site라면(예: Vercel 기본 도메인과 별도 API 도메인), 현재 `SameSite=Lax` 정책으로는 refresh cookie가 전송되지 않을 수 있습니다. 그때는 `SameSite=None`과 `Secure=true`로 변경하고, CORS allowlist·CSRF 위험·브라우저의 third-party cookie 제한을 함께 검토해야 합니다. 이 변경은 배포 도메인이 확정된 뒤 별도 작업으로 진행합니다.
+프론트와 API를 완전히 다른 site로 옮긴다면(예: Vercel 기본 도메인과 별도 API 도메인), 현재 `SameSite=Lax` 정책으로는 refresh cookie가 전송되지 않을 수 있습니다. 그때는 `SameSite=None`과 `Secure=true`로 변경하고, CORS allowlist·CSRF 위험·브라우저의 third-party cookie 제한을 함께 검토해야 합니다.
 
 ## 운영 배포 설정
 
@@ -338,24 +369,26 @@ fetch("https://api.example.com/api/auth/refresh", {
 - `AI_PROVIDER=openai`: `OPENAI_API_KEY`
 - `AI_PROVIDER=gemini`: `GEMINI_ENABLED=true`, `GEMINI_API_KEY`, Gemini model
 
-운영 예시는 다음과 같습니다.
+운영 Compose용 `.env.production` 예시는 다음과 같습니다. `SPRING_PROFILES_ACTIVE`, `DB_URL`, `REDIS_HOST`, `REDIS_PORT`는 `docker-compose.prod.yml`이 컨테이너 내부 값으로 설정하므로 이 파일에 중복해서 넣지 않습니다.
 
-```bash
-SPRING_PROFILES_ACTIVE=prod
-DB_URL=jdbc:postgresql://localhost:5432/myenglishvocab
+```dotenv
+CORS_ALLOWED_ORIGINS=https://app.myenglishvocab.com
 DB_USERNAME=vocab_app
 DB_PASSWORD=change-me-to-a-long-random-password
-CORS_ALLOWED_ORIGINS=https://myenglishvocab.example.com
 JWT_SECRET=change-me-to-a-long-random-secret-at-least-32-characters
 AI_PROVIDER=openai
 OPENAI_API_KEY=your-openai-api-key
+GEMINI_ENABLED=true
+GEMINI_API_KEY=
 ```
 
-프론트와 API는 `app.example.com`, `api.example.com`처럼 같은 최상위 도메인의 HTTPS 주소를 사용하는 구성을 권장합니다. EC2 등에 배포할 때 PostgreSQL `5432`, Redis `6379`, Spring Boot `8080` 포트를 인터넷에 직접 공개하지 않고, 외부 요청은 HTTPS가 적용된 프록시나 로드밸런서를 통해 전달합니다.
+프론트와 API는 `app.myenglishvocab.com`, `api.myenglishvocab.com`처럼 같은 최상위 도메인의 HTTPS 주소를 사용합니다. EC2에서 PostgreSQL `5432`, Redis `6379`, Spring Boot `8080` 포트는 인터넷에 직접 공개하지 않고, 외부 요청은 HTTPS가 적용된 Nginx를 통해 전달합니다.
 
 배포 후에는 `/actuator/health`뿐 아니라 회원가입, 로그인, 새로고침 후 로그인 복구, 로그아웃, 단어 CRUD, AI 생성과 퀴즈까지 Smoke Test를 진행합니다.
 
-## CI
+## CI/CD
+
+### CI
 
 GitHub Actions가 `main`에 대한 push와 pull request마다 테스트를 실행합니다.
 
@@ -365,7 +398,18 @@ GitHub Actions가 `main`에 대한 push와 pull request마다 테스트를 실�
 
 PR 페이지의 **Checks / Actions** 탭에서 결과를 확인할 수 있습니다.
 
-현재 GitHub Actions는 CI까지만 담당하며, `main` Merge 후 EC2에 배포하는 CD는 아직 없습니다. 다음 단계에서는 GitHub OIDC로 AWS 임시 권한을 얻고 Systems Manager Run Command로 위 수동 배포 명령을 실행하도록 구성합니다. SSH `22`번 포트를 GitHub Actions에 공개하거나 EC2를 self-hosted runner로 사용하지 않습니다.
+### CD
+
+- 워크플로: `.github/workflows/deploy.yml`
+- 실행 조건: `main` push 또는 수동 `workflow_dispatch`
+- 인증: GitHub OIDC로 배포 전용 IAM Role의 임시 권한 획득
+- 명령 전달: AWS Systems Manager Run Command
+- EC2 작업: 깨끗한 작업 트리 확인 → `main` 갱신 → `ops/deploy-production.sh`
+- 배포 작업: `docker compose up --build -d` → 내부 Health Check
+- Actions 작업: SSM 출력 수집 → 외부 Health Check
+- 실패 처리: SSM으로 관련 Docker 상태와 로그를 다시 수집해 Actions Log에 출력
+
+GitHub 저장소에는 AWS 장기 Access Key나 `.env.production`을 저장하지 않습니다. IAM 권한은 대상 EC2에 `AWS-RunShellScript`를 보내고 해당 명령 결과를 조회하는 데 필요한 SSM 작업으로 제한합니다.
 
 ## DB 마이그레이션 (Flyway)
 
@@ -374,6 +418,7 @@ PR 페이지의 **Checks / Actions** 탭에서 결과를 확인할 수 있습니
 - 마이그레이션 위치: `src/main/resources/db/migration/`
   - `V1__create_users.sql` — users 테이블
   - `V2__create_words.sql` — words 테이블
+  - `V3__add_favorite_to_words.sql` — 기존 단어와 호환되는 즐겨찾기 컬럼 추가
 - 앱 기동 시 Flyway가 아직 적용되지 않은 버전만 순서대로 실행합니다.
 - JPA `ddl-auto`는 `validate`입니다. (엔티티와 DB 스키마 일치만 검사)
 - 적용 이력은 현재 사용하는 DB(H2 또는 PostgreSQL)의 `flyway_schema_history` 테이블에서 확인할 수 있습니다.
@@ -384,7 +429,7 @@ PR 페이지의 **Checks / Actions** 탭에서 결과를 확인할 수 있습니
 rm -f vocabdb.mv.db vocabdb.trace.db
 ```
 
-그다음 앱을 다시 실행하면 V1, V2가 다시 적용됩니다. (로컬 데이터는 삭제됩니다.)
+그다음 앱을 다시 실행하면 V1부터 V3까지 다시 적용됩니다. (로컬 데이터는 삭제됩니다.)
 
 ## 인증 흐름
 1. `POST /api/auth/signup` — 회원가입
@@ -536,10 +581,14 @@ curl -X POST http://localhost:8080/api/words/generate-example \
 ## 프로젝트 구조
 ```
 .github/workflows/ci.yml      # GitHub Actions CI
-docker-compose.yml            # 로컬 Redis, PostgreSQL
+.github/workflows/deploy.yml  # GitHub OIDC + AWS SSM 운영 CD
+docker-compose.yml            # 로컬 Redis, PostgreSQL, Spring Boot
+docker-compose.prod.yml       # EC2 운영 Compose
+ops/deploy-production.sh      # EC2 재빌드와 내부 Health Check
 src/main/resources/db/migration/
   V1__create_users.sql
   V2__create_words.sql
+  V3__add_favorite_to_words.sql
 user/
   controller/AuthController
   service/UserService
