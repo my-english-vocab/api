@@ -419,6 +419,8 @@ GitHub 저장소에는 AWS 장기 Access Key나 `.env.production`을 저장하�
   - `V1__create_users.sql` — users 테이블
   - `V2__create_words.sql` — words 테이블
   - `V3__add_favorite_to_words.sql` — 기존 단어와 호환되는 즐겨찾기 컬럼 추가
+  - `V4__create_quiz_set_attempts.sql` — 퀴즈 세트 완료 이력 추가
+  - `V5__add_admin_and_analytics.sql` — 사용자 역할·상태·가입/로그인 시각과 활동 통계 테이블 추가
 - 앱 기동 시 Flyway가 아직 적용되지 않은 버전만 순서대로 실행합니다.
 - JPA `ddl-auto`는 `validate`입니다. (엔티티와 DB 스키마 일치만 검사)
 - 적용 이력은 현재 사용하는 DB(H2 또는 PostgreSQL)의 `flyway_schema_history` 테이블에서 확인할 수 있습니다.
@@ -429,7 +431,7 @@ GitHub 저장소에는 AWS 장기 Access Key나 `.env.production`을 저장하�
 rm -f vocabdb.mv.db vocabdb.trace.db
 ```
 
-그다음 앱을 다시 실행하면 V1부터 V3까지 다시 적용됩니다. (로컬 데이터는 삭제됩니다.)
+그다음 앱을 다시 실행하면 V1부터 V5까지 다시 적용됩니다. (로컬 데이터는 삭제됩니다.)
 
 ## 인증 흐름
 1. `POST /api/auth/signup` — 회원가입
@@ -438,6 +440,9 @@ rm -f vocabdb.mv.db vocabdb.trace.db
 4. Access 만료 시 `POST /api/auth/refresh` — 쿠키의 refresh로 재발급 (RTR, Set-Cookie로 새 refresh)
 5. `POST /api/auth/logout` — Redis refresh 삭제 + 쿠키 만료
 6. `GET /api/auth/me` — 인증된 사용자 정보 조회
+7. `POST /api/auth/withdraw` — 현재 비밀번호 확인 후 단어·퀴즈 데이터 삭제, 계정 탈퇴 처리와 기존 refresh 무효화
+
+Access Token이 유효하더라도 서버는 인증 요청마다 현재 사용자의 `role`과 `status`를 DB에서 확인합니다. 프런트도 앱 시작 시 `/api/auth/me`로 최신 역할을 동기화합니다.
 
 ### Swagger UI에서 Bearer 인증하기
 
@@ -589,10 +594,20 @@ src/main/resources/db/migration/
   V1__create_users.sql
   V2__create_words.sql
   V3__add_favorite_to_words.sql
+  V4__create_quiz_set_attempts.sql
+  V5__add_admin_and_analytics.sql
 user/
   controller/AuthController
   service/UserService
   entity/User
+  entity/UserRole
+  entity/UserStatus
+admin/
+  controller/AdminStatisticsController
+  service/AdminStatisticsService
+analytics/
+  controller/AnalyticsController
+  service/ActivityService
 word/
   controller/WordController
   service/WordService
