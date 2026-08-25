@@ -16,6 +16,9 @@ JWT Access Token + Redis Refresh Token 인증, 사용자별 단어장 API, AI �
 - Spring Boot Actuator (Health Check)
 - Docker · Docker Compose (백엔드, Redis, PostgreSQL)
 - GitHub Actions CI/CD (PR/`main` 테스트, `main` Merge 후 EC2 자동 배포)
+- 관리자 역할, 가입·로그인·활동 이력과 운영 통계 API
+
+관리자 통계의 지표 정의, 최초 관리자 지정, API 목록과 개인정보 경계는 [`ops/admin-statistics.md`](ops/admin-statistics.md)에 정리했습니다.
 
 ## 로컬 실행
 

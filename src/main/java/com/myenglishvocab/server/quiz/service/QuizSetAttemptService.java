@@ -1,5 +1,7 @@
 package com.myenglishvocab.server.quiz.service;
 
+import com.myenglishvocab.server.analytics.entity.ActivityType;
+import com.myenglishvocab.server.analytics.service.ActivityService;
 import com.myenglishvocab.server.common.exception.BusinessException;
 import com.myenglishvocab.server.common.exception.ErrorCode;
 import com.myenglishvocab.server.quiz.dto.CompleteQuizSetAttemptRequest;
@@ -14,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.time.Instant;
 
 @Slf4j
 @Service
@@ -22,6 +25,7 @@ public class QuizSetAttemptService {
 
     private final QuizSetAttemptRepository quizSetAttemptRepository;
     private final UserRepository userRepository;
+    private final ActivityService activityService;
 
     @Transactional(readOnly = true)
     public List<QuizSetAttemptSummaryResponse> getMySummaries(Long userId) {
@@ -53,6 +57,7 @@ public class QuizSetAttemptService {
                 request.learnedCount()
         );
         quizSetAttemptRepository.save(attempt);
+        activityService.record(user, ActivityType.QUIZ_SET_COMPLETED, null, Instant.now());
 
         log.info(
                 "퀴즈 세트 완료 userId={} setNumber={} wordCount={} learnedCount={}",

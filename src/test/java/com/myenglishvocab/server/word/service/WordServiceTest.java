@@ -1,5 +1,6 @@
 package com.myenglishvocab.server.word.service;
 
+import com.myenglishvocab.server.analytics.service.ActivityService;
 import com.myenglishvocab.server.common.exception.BusinessException;
 import com.myenglishvocab.server.common.exception.ErrorCode;
 import com.myenglishvocab.server.user.entity.User;
@@ -32,6 +33,7 @@ class WordServiceTest {
 
     @Mock WordRepository wordRepository;
     @Mock UserRepository userRepository;
+    @Mock ActivityService activityService;
     @InjectMocks WordService wordService;
 
     @Test

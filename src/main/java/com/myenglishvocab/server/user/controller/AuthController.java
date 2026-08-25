@@ -131,4 +131,20 @@ public class AuthController {
                 .header(HttpHeaders.SET_COOKIE, clear.toString())
                 .build();
     }
+
+    @Operation(
+            summary = "회원 탈퇴",
+            description = "비밀번호를 다시 확인하고 단어·퀴즈 데이터를 삭제한 뒤 계정을 탈퇴 상태로 전환합니다."
+    )
+    @PostMapping("/withdraw")
+    public ResponseEntity<Void> withdraw(
+            @AuthenticationPrincipal JwtPrincipal principal,
+            @Valid @RequestBody WithdrawRequest request
+    ) {
+        userService.withdraw(principal.userId(), request);
+        ResponseCookie clear = AuthCookieFactory.clearRefreshCookie(cookieSecure);
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, clear.toString())
+                .build();
+    }
 }

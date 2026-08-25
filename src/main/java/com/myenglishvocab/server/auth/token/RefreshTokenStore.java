@@ -9,5 +9,7 @@ public interface RefreshTokenStore {
 
     void delete(String refreshToken);
 
+    void deleteAllByUserId(Long userId);
+
     Optional<Long> findUserId(String refreshToken);
 }
