@@ -46,7 +46,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> {
                     auth.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                             .requestMatchers("/error").permitAll()
-                            .requestMatchers("/actuator/health").permitAll();
+                            .requestMatchers(
+                                    "/actuator/health",
+                                    "/actuator/prometheus"
+                            ).permitAll();
 
                     if (h2ConsoleEnabled) {
                         auth.requestMatchers("/h2-console/**").permitAll();
