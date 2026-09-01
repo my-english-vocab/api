@@ -80,6 +80,21 @@ jobs:
             -f docker-compose.home.yml \
             up -d --no-build app
 
+      - name: Wait for application health
+        run: |
+          for i in {1..30}; do
+            if curl -fsS https://api.myenglishvocab.com/actuator/health > /dev/null; then
+              echo "Application is healthy"
+              exit 0
+            fi
+
+            echo "Waiting for application health... ($i/30)"
+            sleep 5
+          done
+
+          echo "Application health check failed"
+          exit 1
+
       - name: Show deployment status
         run: |
           cd /home/hyungyu/services/myenglishvocab-api
