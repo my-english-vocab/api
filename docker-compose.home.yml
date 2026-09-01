@@ -71,7 +71,7 @@ services:
       - traefik.enable=true
       - traefik.docker.network=proxy
 
-      - traefik.http.routers.myenglishvocab.rule=Host(`api.myenglishvocab.com`)
+      - traefik.http.routers.myenglishvocab.rule=Host(`api.myenglishvocab.com`) && !PathPrefix(`/actuator/prometheus`)
       - traefik.http.routers.myenglishvocab.entrypoints=websecure
       - traefik.http.routers.myenglishvocab.tls=true
       - traefik.http.routers.myenglishvocab.tls.certresolver=cloudflare
