@@ -3,7 +3,7 @@
 Spring Boot 기반 영어 단어장 API 서버입니다.  
 JWT Access Token + Redis Refresh Token 인증, 사용자별 단어장 API, AI 예문 생성, 표준 에러 응답을 적용했습니다.
 
-로컬에서는 Docker Compose로 백엔드·PostgreSQL·Redis를 함께 실행할 수 있습니다. 운영 환경은 AWS EC2에서 Nginx·Spring Boot·PostgreSQL·Redis를 `docker-compose.prod.yml`로 실행하며, HTTPS와 내부·외부 Health Check를 적용했습니다.
+로컬에서는 Docker Compose로 백엔드·PostgreSQL·Redis를 함께 실행할 수 있습니다. 운영 환경은 FIREBAT 홈서버에서 Spring Boot·PostgreSQL·Redis를 `docker-compose.home.yml`로 실행하고, 별도 Traefik 스택이 HTTPS 요청을 전달합니다.
 
 ## Tech Stack
 - Java 21, Spring Boot 4
@@ -15,10 +15,10 @@ JWT Access Token + Redis Refresh Token 인증, 사용자별 단어장 API, AI �
 - SpringDoc OpenAPI
 - Spring Boot Actuator (Health Check)
 - Docker · Docker Compose (백엔드, Redis, PostgreSQL)
-- GitHub Actions CI/CD (PR/`main` 테스트, `main` Merge 후 EC2 자동 배포)
+- GitHub Actions CI/CD (PR/`main` 테스트, GHCR 이미지와 self-hosted runner를 이용한 홈서버 자동 배포)
 - 관리자 역할, 가입·로그인·활동 이력과 운영 통계 API
 
-관리자 통계의 지표 정의, 최초 관리자 지정, API 목록과 개인정보 경계는 [`ops/admin-statistics.md`](ops/admin-statistics.md)에 정리했습니다.
+현재 홈서버 운영 기준은 [`ops/home-server.md`](ops/home-server.md), 관리자 통계의 지표 정의, 최초 관리자 지정, API 목록과 개인정보 경계는 [`ops/admin-statistics.md`](ops/admin-statistics.md)에 정리했습니다.
 
 ## 로컬 실행
 
@@ -181,25 +181,24 @@ docker compose down -v
 
 ## 운영 배포
 
-로컬용 `docker-compose.yml`은 학습과 통합 실행을 위해 PostgreSQL, Redis, Spring Boot 포트를 호스트에 공개합니다. 실제 EC2에서는 이를 사용하지 않고 `docker-compose.prod.yml`을 사용합니다.
-
-운영 Compose는 Nginx만 `80`, `443` 포트를 공개합니다. PostgreSQL(`5432`), Redis(`6379`), Spring Boot(`8080`)는 Docker 내부 네트워크에만 두고, Nginx가 HTTPS 요청을 `app:8080`으로 전달합니다.
+로컬용 `docker-compose.yml`은 학습과 통합 실행을 위해 PostgreSQL, Redis, Spring Boot 포트를 호스트에 공개합니다. 홈서버 운영에서는 `docker-compose.home.yml`을 사용합니다. 이전 AWS EC2용 `docker-compose.prod.yml`, Nginx·Certbot 설정과 `ops/deploy-production.sh`는 현재 배포 경로가 아닌 레거시 자료입니다.
 
 ### 현재 운영 상태
 
 - 프론트엔드: Vercel (`https://app.myenglishvocab.com`)
-- 백엔드: AWS EC2 (`https://api.myenglishvocab.com`)
-- 실행 구성: Nginx, Spring Boot, PostgreSQL, Redis
-- 공개 포트: `80`, `443`만 사용
-- HTTPS: Let's Encrypt 인증서와 Certbot 자동 갱신 적용
-- 데이터 보호: PostgreSQL·Redis named Volume 유지, PostgreSQL 정기 백업 적용
-- 배포 방식: GitHub OIDC와 AWS Systems Manager Run Command를 이용한 GitHub Actions 자동 배포
+- 백엔드: FIREBAT 홈서버 (`https://api.myenglishvocab.com`)
+- 앱 스택: Spring Boot, PostgreSQL 17, Redis 7
+- HTTPS: 별도 Traefik v3 스택과 Let's Encrypt Cloudflare DNS-01
+- 네트워크: Traefik만 호스트 `80`, `443`을 사용하고 앱·DB·Redis 포트는 공개하지 않음
+- 배포: GitHub-hosted runner 빌드 → GHCR push → 홈서버 self-hosted runner 배포
+- 관측: Actuator·Micrometer, Prometheus, Grafana, node-exporter, cAdvisor
+- 데이터 보호: PostgreSQL·Redis named Volume과 매일 실행되는 PostgreSQL 백업 유지
 
-`main`에 변경이 반영되면 GitHub Actions가 장기 AWS Access Key 없이 OIDC 임시 권한을 얻어 EC2에 SSM 명령을 보냅니다. EC2는 최신 `main`을 받은 뒤 운영 Compose를 다시 빌드하고, 내부·외부 Health Check를 수행합니다. 운영 비밀값은 EC2의 `.env.production`에 유지하며 PostgreSQL·Redis Volume은 삭제하지 않습니다. SSH `22`번 포트를 GitHub Actions에 공개하거나 EC2를 self-hosted runner로 사용하지 않습니다.
+홈서버의 배포 저장소는 `/home/hyungyu/services/myenglishvocab-api`에 있습니다. 앱 컨테이너는 외부 `proxy` Docker 네트워크를 통해 Traefik과 연결되고, `/actuator/prometheus`는 공개 라우터에서 제외되어 내부 Prometheus만 수집할 수 있습니다.
 
 ### 운영 환경 변수
 
-운영 비밀값은 Git에 넣지 않습니다. EC2에서만 아래처럼 만듭니다.
+운영 비밀값은 Git, GitHub Actions 설정, GHCR 이미지에 넣지 않습니다. 홈서버 배포 디렉터리의 `.env.production`에만 두고 파일 권한을 제한합니다.
 
 ```bash
 cp .env.production.example .env.production
@@ -208,67 +207,37 @@ chmod 600 .env.production
 
 `.env.production`에는 강한 DB 비밀번호, 32자 이상의 JWT Secret, 선택한 AI Provider의 API Key를 입력합니다. `CORS_ALLOWED_ORIGINS`에는 정확히 `https://app.myenglishvocab.com`을 설정합니다.
 
-### Nginx와 Certbot HTTPS 흐름
+### Traefik과 HTTPS 흐름
 
-Certbot을 실행하기 전에 Cloudflare DNS에서 `api.myenglishvocab.com`의 `A` 레코드가 EC2 Elastic IP를 가리키고, Proxy status가 `DNS only`인지 확인해야 합니다. Let's Encrypt가 인터넷의 `80` 포트로 ACME 검증 파일에 접근할 수 있어야 하기 때문입니다.
+`api.myenglishvocab.com`은 Cloudflare의 DNS only A 레코드이며, 동적 공인 IP는 홈서버의 DDNS systemd timer가 약 5분마다 확인해 갱신합니다. 공유기는 외부 `80`, `443`만 홈서버로 전달하고 SSH `22`는 인터넷에 공개하지 않습니다.
 
-처음에는 `nginx/00-http.conf`만 활성화해 HTTP `80` 포트의 ACME 검증 경로를 제공합니다. Certbot이 `/.well-known/acme-challenge/`에 임시 파일을 만들고, Let's Encrypt가 이를 읽어 `api.myenglishvocab.com`의 소유권을 확인합니다.
+Traefik은 `/home/hyungyu/infra/traefik`의 별도 Compose 프로젝트에서 동작합니다. Cloudflare DNS-01 challenge로 Let's Encrypt 인증서를 발급·갱신하므로, 애플리케이션 저장소의 옛 Nginx·Certbot 설정을 현재 인증서 관리에 사용하지 않습니다.
 
-저장소에는 현재 운영 중인 `nginx/10-https.conf`가 포함되어 있습니다. 아직 인증서가 없는 새 EC2에서는 이 파일을 잠시 `.disabled`로 바꿔 Nginx가 HTTPS 설정을 읽지 않게 해야 합니다. 인증서 발급 후 원래 이름으로 되돌리면 Nginx가 TLS 설정과 역방향 프록시 설정을 읽습니다. 이미 인증서가 있는 현재 운영 서버에서는 이 초기 비활성화 단계를 다시 실행하지 않습니다.
+### 자동 배포 흐름
 
-운영 컨테이너 시작과 인증서 발급은 다음 순서로 진행합니다.
+`.github/workflows/home-server-deploy.yml`은 다음 두 작업으로 나뉩니다.
 
-```bash
-# 새 EC2에서 최초 인증서를 발급할 때만 HTTPS 설정을 잠시 비활성화
-mv nginx/10-https.conf nginx/10-https.conf.disabled
+1. GitHub-hosted runner가 Docker 이미지를 빌드해 `ghcr.io/my-english-vocab/api:sha-<commit>`와 `latest` 태그로 push합니다.
+2. `self-hosted`, `home-server` 라벨의 FIREBAT runner가 해당 커밋을 checkout하고 이미지를 pull한 뒤 `app` 서비스만 `--no-build`로 교체합니다.
+3. `https://api.myenglishvocab.com/actuator/health`가 정상 응답할 때까지 확인하고 Compose 상태를 Actions 로그에 남깁니다.
 
-# Nginx(HTTP), Spring Boot, PostgreSQL, Redis 시작
-sudo docker compose --env-file .env.production -f docker-compose.prod.yml up --build -d
+홈서버는 운영 이미지를 직접 빌드하지 않습니다. AWS OIDC, IAM Role, Systems Manager와 EC2 배포 Workflow는 모두 현재 경로에서 제거되었습니다.
 
-# api.myenglishvocab.com 인증서 발급
-sudo docker compose --env-file .env.production -f docker-compose.prod.yml run --rm certbot \
-  certonly --webroot -w /var/www/certbot \
-  --email you@example.com --agree-tos --no-eff-email \
-  -d api.myenglishvocab.com
-```
+### 수동 상태 확인과 장애 대응
 
-인증서 발급 뒤에는 HTTPS 설정 파일을 원래 이름으로 되돌리고 Nginx를 재시작합니다. 이름을 되돌린 뒤 `git status --short`가 비어 있으면 저장소도 다시 깨끗한 상태입니다.
+일상적인 배포는 GitHub Actions의 **Home Server Deploy**를 다시 실행하는 방식이 우선입니다. 홈서버에서 상태를 직접 확인할 때는 다음 명령을 사용합니다.
 
 ```bash
-mv nginx/10-https.conf.disabled nginx/10-https.conf
-sudo docker compose --env-file .env.production -f docker-compose.prod.yml restart nginx
-```
+cd /home/hyungyu/services/myenglishvocab-api
 
-인증서는 Certbot과 Cron으로 자동 갱신하며, `certbot renew --dry-run`으로 갱신 절차를 검증했습니다.
-
-### 수동 재배포와 장애 대응
-
-자동 배포를 다시 실행할 수 없거나 운영 상태를 직접 점검해야 할 때는 EC2의 백엔드 저장소에서 아래 순서로 수동 재배포할 수 있습니다.
-
-```bash
-git pull --ff-only origin main
-
-sudo docker compose \
+docker compose \
   --env-file .env.production \
-  -f docker-compose.prod.yml \
-  up --build -d
-```
-
-`git pull --ff-only`는 원격 `main`과 선형으로 이어질 때만 변경 사항을 받습니다. EC2에 예상하지 못한 로컬 커밋이 있으면 자동으로 합치지 않고 실패하므로 운영 저장소의 변경을 조기에 발견할 수 있습니다.
-
-`up --build -d`는 애플리케이션 이미지를 다시 빌드하고 필요한 컨테이너를 갱신하지만 named Volume은 삭제하지 않습니다. 운영 데이터가 들어 있는 `postgres-prod-data`, `redis-prod-data`를 보호하기 위해 운영에서는 `docker compose down -v`를 실행하지 않습니다.
-
-배포 후 컨테이너 상태와 내부 Health Check를 확인합니다. Spring Boot의 `8080` 포트는 호스트에 공개하지 않았으므로 내부 확인은 `app` 컨테이너 안에서 실행합니다.
-
-```bash
-sudo docker compose \
-  --env-file .env.production \
-  -f docker-compose.prod.yml \
+  -f docker-compose.home.yml \
   ps
 
-sudo docker compose \
+docker compose \
   --env-file .env.production \
-  -f docker-compose.prod.yml \
+  -f docker-compose.home.yml \
   exec app curl -fsS http://localhost:8080/actuator/health
 
 curl -fsS https://api.myenglishvocab.com/actuator/health
@@ -276,35 +245,26 @@ curl -fsS https://api.myenglishvocab.com/actuator/health
 
 정상 응답에는 `"status":"UP"`이 포함됩니다.
 
-자동 배포 직후 문제가 생겨 긴급하게 이전 코드를 실행해야 한다면 작업 트리가 깨끗한지 확인한 뒤 이전 Commit을 임시로 Checkout하고 같은 Compose 명령으로 다시 빌드할 수 있습니다.
+배포 직후 문제가 생기면 먼저 Actions 로그와 현재 컨테이너 상태·로그를 확인합니다.
 
 ```bash
-cd /home/ubuntu/myenglishvocab-api
-git status --short
-git log --oneline -5
-git switch --detach <PREVIOUS_COMMIT>
-
-sudo docker compose \
+docker compose \
   --env-file .env.production \
-  -f docker-compose.prod.yml \
-  up --build -d
+  -f docker-compose.home.yml \
+  logs --tail=200 app
 ```
 
-이 방식은 긴급 복구용이며, 이번 자동 배포 작업에서는 운영 서버를 이전 Commit으로 되돌릴 이유가 없어 끝까지 실행해 검증하지는 않았습니다. 문제를 해결한 뒤에는 문제가 된 Commit을 되돌리는 Revert Pull Request를 `main`에 반영하는 편이 운영 이력을 보존하는 데 안전합니다. EC2를 다시 현재 `main`으로 돌릴 때는 다음 명령을 사용합니다.
+문제 커밋은 Revert Pull Request로 되돌린 뒤 배포 Workflow를 다시 실행하는 편이 코드와 배포 이력을 일치시키기 쉽습니다. DB Migration에 컬럼 삭제나 의미 변경이 포함됐다면 코드 이미지만 되돌릴 수 있는지 별도로 확인해야 합니다. 복구 과정에서도 PostgreSQL·Redis Volume을 삭제하는 `docker compose down -v`는 사용하지 않습니다.
 
-```bash
-git switch main
-git pull --ff-only origin main
+### 백업·모니터링·재부팅 복구
 
-sudo docker compose \
-  --env-file .env.production \
-  -f docker-compose.prod.yml \
-  up --build -d
-```
+- PostgreSQL은 `/home/hyungyu/infra/backup-myenglishvocab-postgres.sh`와 systemd timer로 매일 `18:00 UTC`에 custom-format dump를 만듭니다.
+- 백업은 `/home/hyungyu/backups/myenglishvocab/postgres`에 보관하며 오래된 파일을 자동 정리합니다. 별도 테스트 DB에 `pg_restore`한 복원 검증까지 완료했습니다.
+- Prometheus, Grafana, node-exporter, cAdvisor는 `/home/hyungyu/infra/monitoring`에서 운영합니다. Grafana만 LAN에 `3000`으로 공개하고 나머지는 호스트 포트를 공개하지 않습니다.
+- 재부팅과 완전 종료 후 수동 전원 켜기에서 Traefik, 앱 스택, 모니터링, DDNS·백업 timer, Actions runner의 자동 복구를 확인했습니다.
+- 정전 후 전원이 돌아왔을 때 자동으로 켜지는 BIOS의 Restore on AC Power Loss 설정은 아직 남아 있습니다.
 
-DB Migration에 컬럼 삭제나 의미 변경이 포함됐다면 코드만 이전 버전으로 되돌릴 수 있는지 별도로 확인해야 합니다. 복구 과정에서도 PostgreSQL·Redis Volume을 삭제하는 `docker compose down -v`는 사용하지 않습니다.
-
-### 4) 테스트
+## 테스트
 ```bash
 ./gradlew test --rerun-tasks
 ```
@@ -369,7 +329,7 @@ fetch("https://api.myenglishvocab.com/api/auth/refresh", {
 - `AI_PROVIDER=openai`: `OPENAI_API_KEY`
 - `AI_PROVIDER=gemini`: `GEMINI_ENABLED=true`, `GEMINI_API_KEY`, Gemini model
 
-운영 Compose용 `.env.production` 예시는 다음과 같습니다. `SPRING_PROFILES_ACTIVE`, `DB_URL`, `REDIS_HOST`, `REDIS_PORT`는 `docker-compose.prod.yml`이 컨테이너 내부 값으로 설정하므로 이 파일에 중복해서 넣지 않습니다.
+운영 Compose용 `.env.production` 예시는 다음과 같습니다. `SPRING_PROFILES_ACTIVE`, `DB_URL`, `REDIS_HOST`, `REDIS_PORT`는 `docker-compose.home.yml`이 컨테이너 내부 값으로 설정하므로 이 파일에 중복해서 넣지 않습니다.
 
 ```dotenv
 CORS_ALLOWED_ORIGINS=https://app.myenglishvocab.com
@@ -382,7 +342,7 @@ GEMINI_ENABLED=true
 GEMINI_API_KEY=
 ```
 
-프론트와 API는 `app.myenglishvocab.com`, `api.myenglishvocab.com`처럼 같은 최상위 도메인의 HTTPS 주소를 사용합니다. EC2에서 PostgreSQL `5432`, Redis `6379`, Spring Boot `8080` 포트는 인터넷에 직접 공개하지 않고, 외부 요청은 HTTPS가 적용된 Nginx를 통해 전달합니다.
+프론트와 API는 `app.myenglishvocab.com`, `api.myenglishvocab.com`처럼 같은 최상위 도메인의 HTTPS 주소를 사용합니다. 홈서버에서 PostgreSQL `5432`, Redis `6379`, Spring Boot `8080` 포트는 인터넷에 직접 공개하지 않고, 외부 요청은 HTTPS가 적용된 Traefik을 통해 전달합니다.
 
 배포 후에는 `/actuator/health`뿐 아니라 회원가입, 로그인, 새로고침 후 로그인 복구, 로그아웃, 단어 CRUD, AI 생성과 퀴즈까지 Smoke Test를 진행합니다.
 
@@ -400,16 +360,14 @@ PR 페이지의 **Checks / Actions** 탭에서 결과를 확인할 수 있습니
 
 ### CD
 
-- 워크플로: `.github/workflows/deploy.yml`
+- 워크플로: `.github/workflows/home-server-deploy.yml`
 - 실행 조건: `main` push 또는 수동 `workflow_dispatch`
-- 인증: GitHub OIDC로 배포 전용 IAM Role의 임시 권한 획득
-- 명령 전달: AWS Systems Manager Run Command
-- EC2 작업: 깨끗한 작업 트리 확인 → `main` 갱신 → `ops/deploy-production.sh`
-- 배포 작업: `docker compose up --build -d` → 내부 Health Check
-- Actions 작업: SSM 출력 수집 → 외부 Health Check
-- 실패 처리: SSM으로 관련 Docker 상태와 로그를 다시 수집해 Actions Log에 출력
+- 빌드 작업: GitHub-hosted runner가 Docker 이미지를 빌드해 GHCR에 push
+- 배포 작업: 홈서버 self-hosted runner가 커밋별 이미지를 pull하고 `app` 서비스 교체
+- 검증: 외부 `/actuator/health` 확인과 Compose 상태 출력
+- 비밀값: 홈서버 `.env.production`에만 저장하며 GitHub Actions나 이미지에 포함하지 않음
 
-GitHub 저장소에는 AWS 장기 Access Key나 `.env.production`을 저장하지 않습니다. IAM 권한은 대상 EC2에 `AWS-RunShellScript`를 보내고 해당 명령 결과를 조회하는 데 필요한 SSM 작업으로 제한합니다.
+`Backend Deploy`와 `Home Server Runner Test` Workflow는 운영에서 제거했습니다. self-hosted runner는 `/home/hyungyu/actions-runner`에 설치되어 systemd service로 재부팅 후 자동 시작하고 GitHub에 다시 연결됩니다.
 
 ## DB 마이그레이션 (Flyway)
 
@@ -586,10 +544,11 @@ curl -X POST http://localhost:8080/api/words/generate-example \
 ## 프로젝트 구조
 ```
 .github/workflows/ci.yml      # GitHub Actions CI
-.github/workflows/deploy.yml  # GitHub OIDC + AWS SSM 운영 CD
+.github/workflows/home-server-deploy.yml # GHCR + 홈서버 운영 CD
 docker-compose.yml            # 로컬 Redis, PostgreSQL, Spring Boot
-docker-compose.prod.yml       # EC2 운영 Compose
-ops/deploy-production.sh      # EC2 재빌드와 내부 Health Check
+docker-compose.home.yml       # 현재 홈서버 운영 Compose
+docker-compose.prod.yml       # 이전 EC2 운영 Compose(레거시)
+ops/deploy-production.sh      # 이전 EC2 배포 스크립트(레거시)
 src/main/resources/db/migration/
   V1__create_users.sql
   V2__create_words.sql

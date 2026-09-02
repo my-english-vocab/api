@@ -1,46 +1,34 @@
 # PostgreSQL 운영 백업
 
-이 디렉터리는 운영 PostgreSQL 백업 자동화의 Git 관리 원본이다.
+현재 운영 백업은 FIREBAT 홈서버의 systemd service와 timer로 관리한다. 이 디렉터리의 `postgres-backup.sh`와 `postgres-backup.cron`은 이전 AWS EC2 운영 방식의 레거시 원본이며 현재 홈서버에서 실행하지 않는다.
 
-- `postgres-backup.sh`: `pg_dump`로 사용자 지정 형식(`.dump`) 백업을 만들고, 아카이브 검증과 7일 보관 정책을 수행한다.
-- `postgres-backup.cron`: EC2 Cron 등록 원본이다.
-- 실제 백업 파일, 로그 파일, `.env.production`은 Git에 저장하지 않는다.
+- 현재 스크립트: `/home/hyungyu/infra/backup-myenglishvocab-postgres.sh`
+- 백업 경로: `/home/hyungyu/backups/myenglishvocab/postgres`
+- 실행 시각: 매일 `18:00 UTC`(한국 시간 `03:00`)
+- 형식: `pg_dump` custom format
+- 정리: 보관 기간이 지난 백업 자동 삭제
+- 검증 상태: 별도 테스트 DB를 만든 뒤 `pg_restore` 복원 성공 확인
 
-관리자 지정, 통계 기준과 관리자 API 운영 방법은 [`admin-statistics.md`](admin-statistics.md)를 참고한다.
+실제 백업 파일, 로그 파일, `.env.production`과 secret 값은 Git에 저장하지 않는다. 관리자 지정, 통계 기준과 관리자 API 운영 방법은 [`admin-statistics.md`](admin-statistics.md)를 참고한다.
 
-## EC2 설치
+## 현재 상태 확인
 
-PR을 병합한 뒤 EC2에서 최신 코드를 받은 다음 실행한다.
-
-```bash
-cd /home/ubuntu/myenglishvocab-api
-
-sudo install -d -o root -g root -m 700 \
-  /var/backups/myenglishvocab/postgresql
-
-sudo install -o root -g root -m 700 \
-  ops/postgres-backup.sh \
-  /usr/local/sbin/myenglishvocab-postgres-backup
-
-sudo install -o root -g root -m 644 \
-  ops/postgres-backup.cron \
-  /etc/cron.d/myenglishvocab-postgres-backup
-
-sudo touch /var/log/myenglishvocab-postgres-backup.log
-sudo chown root:root /var/log/myenglishvocab-postgres-backup.log
-sudo chmod 600 /var/log/myenglishvocab-postgres-backup.log
-```
-
-EC2 서버 시간은 UTC다. Cron은 매일 `18:00 UTC`, 즉 한국 시간 `03:00 KST`에 실행된다.
-
-## 검증
+systemd unit의 정확한 이름은 홈서버에서 확인하고, 확인된 unit만 조회한다.
 
 ```bash
-sudo /usr/local/sbin/myenglishvocab-postgres-backup
-sudo tail -n 20 /var/log/myenglishvocab-postgres-backup.log
+systemctl list-timers --all | grep -i myenglishvocab
+systemctl list-units --type=service | grep -i myenglishvocab
 ```
 
-성공 로그에는 `backup succeeded`와 `retention cleanup started`가 포함된다.
+백업 디렉터리의 파일명·크기·시각만 확인한다. dump 내용을 출력하거나 운영 DB에 복원하지 않는다.
+
+```bash
+find /home/hyungyu/backups/myenglishvocab/postgres \
+  -maxdepth 1 -type f -name '*.dump' -printf '%TY-%Tm-%Td %TH:%TM %s %f\n' \
+  | sort
+```
+
+`pg_restore -l`은 아카이브를 읽을 수 있다는 확인일 뿐 복구 성공 증거는 아니다. 실제 복원 검증은 운영 DB와 분리된 테스트 DB에서 수행하고 테이블과 주요 데이터까지 확인해야 한다.
 
 ## 안전 경계
 

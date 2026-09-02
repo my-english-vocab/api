@@ -17,25 +17,25 @@
 
 애플리케이션 코드에는 관리자 사용자명을 하드코딩하지 않는다. 관리자도 운영 프런트에서 일반 회원가입으로 먼저 생성한 뒤, 운영자가 정확한 계정 한 개의 역할만 승격한다. 사용자를 SQL로 직접 생성하면 비밀번호 암호화와 가입 이력이 누락되므로 사용하지 않는다.
 
-실행 위치: EC2의 백엔드 저장소
+실행 위치: FIREBAT 홈서버의 백엔드 배포 저장소
 
 ```bash
-cd /home/ubuntu/myenglishvocab-api
+cd /home/hyungyu/services/myenglishvocab-api
 
 git status --short
 
-sudo docker compose \
+docker compose \
   --env-file .env.production \
-  -f docker-compose.prod.yml \
+  -f docker-compose.home.yml \
   ps
 ```
 
 작업 트리가 깨끗하고 애플리케이션·PostgreSQL·Redis가 정상 상태일 때만 진행한다. PostgreSQL 컨테이너로 들어간다.
 
 ```bash
-sudo docker compose \
+docker compose \
   --env-file .env.production \
-  -f docker-compose.prod.yml \
+  -f docker-compose.home.yml \
   exec postgres sh
 ```
 
