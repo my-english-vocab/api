@@ -140,6 +140,16 @@ public class UserService {
     }
 
     @Transactional
+    public ProfileResponse updateProfile(Long userId, UpdateProfileRequest request) {
+        User user = userRepository.findByIdAndStatus(userId, UserStatus.ACTIVE)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        user.changeDisplayName(request.displayName().trim());
+        log.info("프로필 수정 완료 userId={}", userId);
+        return ProfileResponse.from(user);
+    }
+
+    @Transactional
     public void withdraw(Long userId, WithdrawRequest request) {
         User user = userRepository.findByIdAndStatus(userId, UserStatus.ACTIVE)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));

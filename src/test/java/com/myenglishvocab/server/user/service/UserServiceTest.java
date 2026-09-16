@@ -13,6 +13,7 @@ import com.myenglishvocab.server.user.dto.LoginSession;
 import com.myenglishvocab.server.user.dto.RefreshSession;
 import com.myenglishvocab.server.user.dto.SignupRequest;
 import com.myenglishvocab.server.user.dto.TokenResponse;
+import com.myenglishvocab.server.user.dto.UpdateProfileRequest;
 import com.myenglishvocab.server.user.entity.User;
 import com.myenglishvocab.server.quiz.repository.QuizSetAttemptRepository;
 import com.myenglishvocab.server.user.repository.UserRepository;
@@ -133,6 +134,23 @@ class UserServiceTest {
 
         verify(passwordEncoder).encode("password1");
         verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    void 표시_이름을_공백_정리해_수정한다() {
+        User user = User.builder()
+                .username("hyungyu")
+                .password("encoded")
+                .displayName("현규")
+                .build();
+        ReflectionTestUtils.setField(user, "id", 1L);
+        given(userRepository.findByIdAndStatus(1L, com.myenglishvocab.server.user.entity.UserStatus.ACTIVE))
+                .willReturn(Optional.of(user));
+
+        var response = userService.updateProfile(1L, new UpdateProfileRequest("  새 이름  "));
+
+        assertThat(response.displayName()).isEqualTo("새 이름");
+        assertThat(user.getDisplayName()).isEqualTo("새 이름");
     }
 
     @Test

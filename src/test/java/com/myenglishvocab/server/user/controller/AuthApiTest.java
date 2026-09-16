@@ -13,6 +13,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -70,6 +71,56 @@ class AuthApiTest {
     void 토큰_없이_me_호출하면_거부된다() throws Exception {
         mockMvc.perform(get("/api/auth/me"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void 로그인한_사용자는_표시_이름을_수정할_수_있다() throws Exception {
+        String username = "profile_" + System.currentTimeMillis() % 1_000_000_000L;
+        signup(username);
+
+        MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "%s",
+                                  "password": "password1"
+                                }
+                                """.formatted(username)))
+                .andExpect(status().isOk())
+                .andReturn();
+        String token = JsonPath.read(loginResult.getResponse().getContentAsString(), "$.accessToken");
+
+        mockMvc.perform(patch("/api/auth/me")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"displayName":"  새 이름  "}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value(username))
+                .andExpect(jsonPath("$.displayName").value("새 이름"));
+    }
+
+    @Test
+    void 빈_표시_이름은_수정할_수_없다() throws Exception {
+        String username = "pinv_" + System.currentTimeMillis() % 1_000_000_000L;
+        signup(username);
+        MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"username":"%s","password":"password1"}
+                                """.formatted(username)))
+                .andReturn();
+        String token = JsonPath.read(loginResult.getResponse().getContentAsString(), "$.accessToken");
+
+        mockMvc.perform(patch("/api/auth/me")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"displayName":"   "}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON_INVALID_INPUT"));
     }
 
     @Test

@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface WordRepository extends JpaRepository<Word, Long> {
+    boolean existsByUserId(Long userId);
 
     List<Word> findByUserIdOrderByCreatedAtAsc(Long userId);
 

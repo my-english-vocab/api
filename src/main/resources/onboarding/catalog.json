@@ -1,0 +1,621 @@
+{
+  "version": 3,
+  "tracks": [
+    {
+      "id": "toeic",
+      "title": "토익 준비",
+      "subtitle": "TOEIC",
+      "description": "회사 생활부터 비즈니스 문서까지",
+      "words": [
+        {
+          "id": "toeic-schedule",
+          "difficulty": "beginner",
+          "term": "schedule",
+          "definition": "일정; 일정을 잡다",
+          "exampleSentence": "Please check the meeting schedule before Friday.",
+          "meaningOfExampleSentence": "금요일 전에 회의 일정을 확인해 주세요."
+        },
+        {
+          "id": "toeic-employee",
+          "difficulty": "beginner",
+          "term": "employee",
+          "definition": "직원, 종업원",
+          "exampleSentence": "Every employee receives safety training.",
+          "meaningOfExampleSentence": "모든 직원은 안전 교육을 받습니다."
+        },
+        {
+          "id": "toeic-deadline",
+          "difficulty": "intermediate",
+          "term": "deadline",
+          "definition": "마감일, 기한",
+          "exampleSentence": "The deadline for submitting the report is Monday.",
+          "meaningOfExampleSentence": "보고서 제출 마감일은 월요일입니다."
+        },
+        {
+          "id": "toeic-invoice",
+          "difficulty": "intermediate",
+          "term": "invoice",
+          "definition": "청구서, 송장",
+          "exampleSentence": "We will send the invoice after the goods arrive.",
+          "meaningOfExampleSentence": "상품이 도착한 후 청구서를 보내겠습니다."
+        },
+        {
+          "id": "toeic-eligible",
+          "difficulty": "intermediate",
+          "term": "eligible",
+          "definition": "자격이 있는",
+          "exampleSentence": "Full-time employees are eligible for this benefit.",
+          "meaningOfExampleSentence": "정규직 직원은 이 혜택을 받을 자격이 있습니다."
+        },
+        {
+          "id": "toeic-reimbursement",
+          "difficulty": "advanced",
+          "term": "reimbursement",
+          "definition": "비용 상환, 환급",
+          "exampleSentence": "Keep your receipts to request reimbursement for travel expenses.",
+          "meaningOfExampleSentence": "출장 경비 상환을 요청하려면 영수증을 보관하세요."
+        },
+        {
+          "id": "toeic-compliance",
+          "difficulty": "advanced",
+          "term": "compliance",
+          "definition": "규정·법규 등의 준수",
+          "exampleSentence": "The company reviews its policies to ensure compliance with safety regulations.",
+          "meaningOfExampleSentence": "회사는 안전 규정 준수를 보장하기 위해 사내 정책을 검토합니다."
+        },
+        {
+          "id": "toeic-contingency",
+          "difficulty": "advanced",
+          "term": "contingency",
+          "definition": "만일의 사태, 우발적 상황",
+          "exampleSentence": "We need a contingency plan in case the supplier cannot deliver on time.",
+          "meaningOfExampleSentence": "공급업체가 제때 납품하지 못할 경우에 대비한 비상 계획이 필요합니다."
+        },
+        {
+          "id": "toeic-procurement",
+          "difficulty": "advanced",
+          "term": "procurement",
+          "definition": "조달, 구매",
+          "exampleSentence": "The procurement team compares prices before choosing a supplier.",
+          "meaningOfExampleSentence": "조달팀은 공급업체를 선택하기 전에 가격을 비교합니다."
+        },
+        {
+          "id": "toeic-discrepancy",
+          "difficulty": "advanced",
+          "term": "discrepancy",
+          "definition": "불일치, 차이",
+          "exampleSentence": "We found a discrepancy between the invoice and the purchase order.",
+          "meaningOfExampleSentence": "청구서와 구매 주문서 사이에서 불일치를 발견했습니다."
+        }
+      ]
+    },
+    {
+      "id": "csat",
+      "title": "수능 영어 준비",
+      "subtitle": "READING",
+      "description": "지문의 흐름을 읽는 독해 어휘",
+      "words": [
+        {
+          "id": "csat-environment",
+          "difficulty": "beginner",
+          "term": "environment",
+          "definition": "환경",
+          "exampleSentence": "A quiet environment helps students focus on reading.",
+          "meaningOfExampleSentence": "조용한 환경은 학생들이 독서에 집중하는 데 도움이 됩니다."
+        },
+        {
+          "id": "csat-increase",
+          "difficulty": "beginner",
+          "term": "increase",
+          "definition": "증가하다, 증가시키다",
+          "exampleSentence": "Regular practice can increase your reading speed.",
+          "meaningOfExampleSentence": "규칙적인 연습은 읽기 속도를 높일 수 있습니다."
+        },
+        {
+          "id": "csat-evidence",
+          "difficulty": "intermediate",
+          "term": "evidence",
+          "definition": "증거, 근거",
+          "exampleSentence": "The researchers collected evidence to support their claim.",
+          "meaningOfExampleSentence": "연구자들은 자신들의 주장을 뒷받침할 증거를 수집했습니다."
+        },
+        {
+          "id": "csat-perspective",
+          "difficulty": "intermediate",
+          "term": "perspective",
+          "definition": "관점, 시각",
+          "exampleSentence": "Travel can help us see familiar problems from a different perspective.",
+          "meaningOfExampleSentence": "여행은 익숙한 문제를 다른 관점에서 바라보는 데 도움이 될 수 있습니다."
+        },
+        {
+          "id": "csat-significant",
+          "difficulty": "intermediate",
+          "term": "significant",
+          "definition": "중요한, 상당한",
+          "exampleSentence": "Small changes in daily habits can make a significant difference.",
+          "meaningOfExampleSentence": "일상 습관의 작은 변화가 상당한 차이를 만들 수 있습니다."
+        },
+        {
+          "id": "csat-constraint",
+          "difficulty": "advanced",
+          "term": "constraint",
+          "definition": "제약, 제한",
+          "exampleSentence": "Limited time is a common constraint in scientific research.",
+          "meaningOfExampleSentence": "제한된 시간은 과학 연구에서 흔한 제약입니다."
+        },
+        {
+          "id": "csat-implicit",
+          "difficulty": "advanced",
+          "term": "implicit",
+          "definition": "암묵적인, 내포된",
+          "exampleSentence": "The writer leaves an implicit message for readers to discover.",
+          "meaningOfExampleSentence": "작가는 독자들이 발견하도록 암묵적인 메시지를 남깁니다."
+        },
+        {
+          "id": "csat-undermine",
+          "difficulty": "advanced",
+          "term": "undermine",
+          "definition": "약화시키다, 훼손하다",
+          "exampleSentence": "Repeated broken promises can undermine trust within a group.",
+          "meaningOfExampleSentence": "반복적으로 약속을 어기는 것은 집단 내 신뢰를 약화시킬 수 있습니다."
+        },
+        {
+          "id": "csat-reconcile",
+          "difficulty": "advanced",
+          "term": "reconcile",
+          "definition": "조화시키다, 양립시키다",
+          "exampleSentence": "It is difficult to reconcile economic growth with environmental protection.",
+          "meaningOfExampleSentence": "경제 성장과 환경 보호를 조화시키기는 어렵습니다."
+        },
+        {
+          "id": "csat-substantiate",
+          "difficulty": "advanced",
+          "term": "substantiate",
+          "definition": "입증하다, 근거로 뒷받침하다",
+          "exampleSentence": "The study provides data to substantiate the claim.",
+          "meaningOfExampleSentence": "그 연구는 해당 주장을 뒷받침할 데이터를 제공합니다."
+        }
+      ]
+    },
+    {
+      "id": "daily",
+      "title": "일상·여행 영어",
+      "subtitle": "EVERYDAY",
+      "description": "여행과 일상에서 바로 쓰는 표현",
+      "words": [
+        {
+          "id": "daily-order",
+          "difficulty": "beginner",
+          "term": "order",
+          "definition": "주문하다; 주문",
+          "exampleSentence": "I would like to order a cup of tea.",
+          "meaningOfExampleSentence": "차 한 잔을 주문하고 싶어요."
+        },
+        {
+          "id": "daily-nearby",
+          "difficulty": "beginner",
+          "term": "nearby",
+          "definition": "근처에; 가까운",
+          "exampleSentence": "Is there a pharmacy nearby?",
+          "meaningOfExampleSentence": "근처에 약국이 있나요?"
+        },
+        {
+          "id": "daily-available",
+          "difficulty": "intermediate",
+          "term": "available",
+          "definition": "이용 가능한; 시간이 있는",
+          "exampleSentence": "Do you have a room available for tonight?",
+          "meaningOfExampleSentence": "오늘 밤 이용할 수 있는 방이 있나요?"
+        },
+        {
+          "id": "daily-recommend",
+          "difficulty": "intermediate",
+          "term": "recommend",
+          "definition": "추천하다",
+          "exampleSentence": "Could you recommend a local restaurant?",
+          "meaningOfExampleSentence": "현지 식당을 추천해 주실 수 있나요?"
+        },
+        {
+          "id": "daily-convenient",
+          "difficulty": "intermediate",
+          "term": "convenient",
+          "definition": "편리한, 이용하기 좋은",
+          "exampleSentence": "The subway is a convenient way to get around the city.",
+          "meaningOfExampleSentence": "지하철은 시내를 돌아다니기에 편리한 교통수단입니다."
+        },
+        {
+          "id": "daily-itinerary",
+          "difficulty": "advanced",
+          "term": "itinerary",
+          "definition": "여행 일정, 일정표",
+          "exampleSentence": "Our itinerary includes a walking tour on the second day.",
+          "meaningOfExampleSentence": "우리 여행 일정에는 둘째 날 도보 투어가 포함되어 있습니다."
+        },
+        {
+          "id": "daily-accommodate",
+          "difficulty": "advanced",
+          "term": "accommodate",
+          "definition": "수용하다; 요구에 맞추다",
+          "exampleSentence": "Can this table accommodate six people?",
+          "meaningOfExampleSentence": "이 테이블에 여섯 명이 앉을 수 있나요?"
+        },
+        {
+          "id": "daily-complimentary",
+          "difficulty": "advanced",
+          "term": "complimentary",
+          "definition": "무료로 제공되는",
+          "exampleSentence": "The hotel offers complimentary breakfast to all guests.",
+          "meaningOfExampleSentence": "호텔은 모든 투숙객에게 무료 조식을 제공합니다."
+        },
+        {
+          "id": "daily-surcharge",
+          "difficulty": "advanced",
+          "term": "surcharge",
+          "definition": "추가 요금",
+          "exampleSentence": "There is a surcharge for checking an extra bag.",
+          "meaningOfExampleSentence": "추가 가방을 수하물로 부치면 추가 요금이 있습니다."
+        },
+        {
+          "id": "daily-layover",
+          "difficulty": "advanced",
+          "term": "layover",
+          "definition": "경유지에서의 대기 시간",
+          "exampleSentence": "We have a three-hour layover in Singapore.",
+          "meaningOfExampleSentence": "우리는 싱가포르 경유지에서 세 시간 동안 대기합니다."
+        }
+      ]
+    },
+    {
+      "id": "toefl",
+      "title": "토플·학술 영어",
+      "subtitle": "ACADEMIC",
+      "description": "강의와 학술 지문을 이해하는 핵심 어휘",
+      "words": [
+        {
+          "id": "toefl-research",
+          "difficulty": "beginner",
+          "term": "research",
+          "definition": "연구, 조사",
+          "exampleSentence": "The research focuses on how sleep affects memory.",
+          "meaningOfExampleSentence": "그 연구는 수면이 기억에 어떤 영향을 주는지에 초점을 맞춥니다."
+        },
+        {
+          "id": "toefl-factor",
+          "difficulty": "beginner",
+          "term": "factor",
+          "definition": "요인, 요소",
+          "exampleSentence": "Climate is an important factor in plant growth.",
+          "meaningOfExampleSentence": "기후는 식물 성장에 중요한 요인입니다."
+        },
+        {
+          "id": "toefl-hypothesis",
+          "difficulty": "intermediate",
+          "term": "hypothesis",
+          "definition": "가설",
+          "exampleSentence": "The experiment was designed to test the original hypothesis.",
+          "meaningOfExampleSentence": "그 실험은 처음의 가설을 검증하기 위해 설계되었습니다."
+        },
+        {
+          "id": "toefl-interpret",
+          "difficulty": "intermediate",
+          "term": "interpret",
+          "definition": "해석하다, 의미를 이해하다",
+          "exampleSentence": "Researchers must interpret the results before drawing a conclusion.",
+          "meaningOfExampleSentence": "연구자들은 결론을 내리기 전에 결과를 해석해야 합니다."
+        },
+        {
+          "id": "toefl-variable",
+          "difficulty": "intermediate",
+          "term": "variable",
+          "definition": "변수, 변할 수 있는 요소",
+          "exampleSentence": "The study controls each variable that might affect the outcome.",
+          "meaningOfExampleSentence": "그 연구는 결과에 영향을 줄 수 있는 각 변수를 통제합니다."
+        },
+        {
+          "id": "toefl-empirical",
+          "difficulty": "advanced",
+          "term": "empirical",
+          "definition": "경험·관찰에 근거한, 실증적인",
+          "exampleSentence": "The theory is supported by empirical evidence from several studies.",
+          "meaningOfExampleSentence": "그 이론은 여러 연구의 실증적 증거로 뒷받침됩니다."
+        },
+        {
+          "id": "toefl-prevalent",
+          "difficulty": "advanced",
+          "term": "prevalent",
+          "definition": "널리 퍼진, 흔한",
+          "exampleSentence": "This belief was prevalent in many societies during that period.",
+          "meaningOfExampleSentence": "이 믿음은 그 시기의 많은 사회에서 널리 퍼져 있었습니다."
+        },
+        {
+          "id": "toefl-infer",
+          "difficulty": "advanced",
+          "term": "infer",
+          "definition": "근거를 바탕으로 추론하다",
+          "exampleSentence": "From the data, we can infer that temperature influenced the reaction.",
+          "meaningOfExampleSentence": "그 데이터로부터 우리는 온도가 반응에 영향을 주었다고 추론할 수 있습니다."
+        },
+        {
+          "id": "toefl-mitigate",
+          "difficulty": "advanced",
+          "term": "mitigate",
+          "definition": "완화하다, 줄이다",
+          "exampleSentence": "Urban trees can help mitigate the effects of extreme heat.",
+          "meaningOfExampleSentence": "도시의 나무는 극심한 더위의 영향을 완화하는 데 도움이 될 수 있습니다."
+        },
+        {
+          "id": "toefl-corroborate",
+          "difficulty": "advanced",
+          "term": "corroborate",
+          "definition": "추가 근거로 입증하다, 뒷받침하다",
+          "exampleSentence": "Later observations helped corroborate the researchers' initial findings.",
+          "meaningOfExampleSentence": "이후의 관찰은 연구자들의 초기 발견을 추가로 뒷받침하는 데 도움이 되었습니다."
+        }
+      ]
+    },
+    {
+      "id": "opic",
+      "title": "오픽·영어 말하기",
+      "subtitle": "SPEAKING",
+      "description": "경험과 의견을 자연스럽게 말하는 표현",
+      "words": [
+        {
+          "id": "opic-hobby",
+          "difficulty": "beginner",
+          "term": "hobby",
+          "definition": "취미",
+          "exampleSentence": "My main hobby is taking photos when I travel.",
+          "meaningOfExampleSentence": "제 주된 취미는 여행할 때 사진을 찍는 것입니다."
+        },
+        {
+          "id": "opic-usually",
+          "difficulty": "beginner",
+          "term": "usually",
+          "definition": "보통, 대개",
+          "exampleSentence": "I usually meet my friends near campus on weekends.",
+          "meaningOfExampleSentence": "저는 보통 주말에 학교 근처에서 친구들을 만납니다."
+        },
+        {
+          "id": "opic-prefer",
+          "difficulty": "intermediate",
+          "term": "prefer",
+          "definition": "더 좋아하다, 선호하다",
+          "exampleSentence": "I prefer quiet cafes because I can talk comfortably there.",
+          "meaningOfExampleSentence": "저는 편하게 이야기할 수 있어서 조용한 카페를 더 좋아합니다."
+        },
+        {
+          "id": "opic-describe",
+          "difficulty": "intermediate",
+          "term": "describe",
+          "definition": "묘사하다, 설명하다",
+          "exampleSentence": "Let me describe the neighborhood where I grew up.",
+          "meaningOfExampleSentence": "제가 자란 동네가 어떤 곳인지 설명해 볼게요."
+        },
+        {
+          "id": "opic-experience",
+          "difficulty": "intermediate",
+          "term": "experience",
+          "definition": "경험; 경험하다",
+          "exampleSentence": "I had a great experience visiting Jeju with my family.",
+          "meaningOfExampleSentence": "저는 가족과 제주도를 방문하며 좋은 경험을 했습니다."
+        },
+        {
+          "id": "opic-memorable",
+          "difficulty": "advanced",
+          "term": "memorable",
+          "definition": "기억에 남는",
+          "exampleSentence": "The most memorable part of the trip was watching the sunrise.",
+          "meaningOfExampleSentence": "그 여행에서 가장 기억에 남는 순간은 일출을 본 것이었습니다."
+        },
+        {
+          "id": "opic-reluctant",
+          "difficulty": "advanced",
+          "term": "reluctant",
+          "definition": "내키지 않는, 꺼리는",
+          "exampleSentence": "I was reluctant to join at first, but I eventually enjoyed it.",
+          "meaningOfExampleSentence": "처음에는 참여하기가 내키지 않았지만, 결국 즐기게 되었습니다."
+        },
+        {
+          "id": "opic-frustrated",
+          "difficulty": "advanced",
+          "term": "frustrated",
+          "definition": "답답한, 좌절감을 느끼는",
+          "exampleSentence": "I felt frustrated when the train was delayed for an hour.",
+          "meaningOfExampleSentence": "기차가 한 시간 지연되었을 때 저는 답답함을 느꼈습니다."
+        },
+        {
+          "id": "opic-spontaneous",
+          "difficulty": "advanced",
+          "term": "spontaneous",
+          "definition": "즉흥적인, 자연스럽게 일어난",
+          "exampleSentence": "We made a spontaneous decision to visit the beach after lunch.",
+          "meaningOfExampleSentence": "우리는 점심 식사 후 해변에 가기로 즉흥적으로 결정했습니다."
+        },
+        {
+          "id": "opic-overwhelming",
+          "difficulty": "advanced",
+          "term": "overwhelming",
+          "definition": "감당하기 벅찬, 압도적인",
+          "exampleSentence": "The city felt overwhelming at first because everything was unfamiliar.",
+          "meaningOfExampleSentence": "처음에는 모든 것이 낯설어서 그 도시가 벅차게 느껴졌습니다."
+        }
+      ]
+    },
+    {
+      "id": "business-email",
+      "title": "비즈니스 이메일",
+      "subtitle": "EMAIL",
+      "description": "업무 요청과 회신을 명확하게 쓰는 어휘",
+      "words": [
+        {
+          "id": "business-email-confirm",
+          "difficulty": "beginner",
+          "term": "confirm",
+          "definition": "확인하다, 확정하다",
+          "exampleSentence": "Please confirm the meeting time by tomorrow afternoon.",
+          "meaningOfExampleSentence": "내일 오후까지 회의 시간을 확인해 주세요."
+        },
+        {
+          "id": "business-email-attach",
+          "difficulty": "beginner",
+          "term": "attach",
+          "definition": "첨부하다",
+          "exampleSentence": "I attached the updated proposal for your review.",
+          "meaningOfExampleSentence": "검토하실 수 있도록 수정된 제안서를 첨부했습니다."
+        },
+        {
+          "id": "business-email-regarding",
+          "difficulty": "intermediate",
+          "term": "regarding",
+          "definition": "~에 관하여, ~와 관련하여",
+          "exampleSentence": "I am writing regarding the delivery scheduled for next week.",
+          "meaningOfExampleSentence": "다음 주로 예정된 배송과 관련하여 연락드립니다."
+        },
+        {
+          "id": "business-email-appreciate",
+          "difficulty": "intermediate",
+          "term": "appreciate",
+          "definition": "감사하게 여기다",
+          "exampleSentence": "I would appreciate your feedback by the end of the day.",
+          "meaningOfExampleSentence": "오늘 업무 종료 전까지 의견을 주시면 감사하겠습니다."
+        },
+        {
+          "id": "business-email-proceed",
+          "difficulty": "intermediate",
+          "term": "proceed",
+          "definition": "진행하다, 계속하다",
+          "exampleSentence": "Please let us know if we can proceed with the order.",
+          "meaningOfExampleSentence": "주문을 진행해도 되는지 알려 주세요."
+        },
+        {
+          "id": "business-email-acknowledge",
+          "difficulty": "advanced",
+          "term": "acknowledge",
+          "definition": "받았음을 알리다, 확인하다",
+          "exampleSentence": "Please acknowledge receipt of the signed contract by tomorrow morning.",
+          "meaningOfExampleSentence": "내일 아침까지 서명된 계약서를 받으셨는지 확인해 주세요."
+        },
+        {
+          "id": "business-email-clarification",
+          "difficulty": "advanced",
+          "term": "clarification",
+          "definition": "명확한 설명, 추가 설명",
+          "exampleSentence": "Could you provide clarification on the revised payment terms?",
+          "meaningOfExampleSentence": "수정된 결제 조건에 대해 추가 설명을 해 주실 수 있나요?"
+        },
+        {
+          "id": "business-email-amend",
+          "difficulty": "advanced",
+          "term": "amend",
+          "definition": "문서의 내용을 수정하다",
+          "exampleSentence": "We can amend the agreement before both parties sign it.",
+          "meaningOfExampleSentence": "양측이 서명하기 전에 계약 내용을 수정할 수 있습니다."
+        },
+        {
+          "id": "business-email-defer",
+          "difficulty": "advanced",
+          "term": "defer",
+          "definition": "미루다, 연기하다",
+          "exampleSentence": "We would like to defer the decision until next Monday.",
+          "meaningOfExampleSentence": "저희는 결정을 다음 주 월요일까지 미루고 싶습니다."
+        },
+        {
+          "id": "business-email-reiterate",
+          "difficulty": "advanced",
+          "term": "reiterate",
+          "definition": "다시 말하다, 재차 강조하다",
+          "exampleSentence": "I would like to reiterate our deadline for submitting the documents.",
+          "meaningOfExampleSentence": "서류 제출 마감일을 다시 한번 강조드리고 싶습니다."
+        }
+      ]
+    },
+    {
+      "id": "it-dev",
+      "title": "IT·개발 문서",
+      "subtitle": "TECH DOCS",
+      "description": "개발 문서와 운영 로그를 읽는 핵심 어휘",
+      "words": [
+        {
+          "id": "it-dev-server",
+          "difficulty": "beginner",
+          "term": "server",
+          "definition": "요청을 처리하거나 자원을 제공하는 서버",
+          "exampleSentence": "The server returns an error when the database is unavailable.",
+          "meaningOfExampleSentence": "데이터베이스를 사용할 수 없으면 서버가 오류를 반환합니다."
+        },
+        {
+          "id": "it-dev-error",
+          "difficulty": "beginner",
+          "term": "error",
+          "definition": "오류, 에러",
+          "exampleSentence": "Check the log to find the cause of the error.",
+          "meaningOfExampleSentence": "오류의 원인을 찾으려면 로그를 확인하세요."
+        },
+        {
+          "id": "it-dev-deploy",
+          "difficulty": "intermediate",
+          "term": "deploy",
+          "definition": "소프트웨어를 배포하여 사용 가능하게 하다",
+          "exampleSentence": "We deploy the new version after all tests pass.",
+          "meaningOfExampleSentence": "모든 테스트가 통과한 후 새 버전을 배포합니다."
+        },
+        {
+          "id": "it-dev-configure",
+          "difficulty": "intermediate",
+          "term": "configure",
+          "definition": "시스템이나 소프트웨어를 설정하다",
+          "exampleSentence": "Configure the service correctly before starting the application in production.",
+          "meaningOfExampleSentence": "운영 환경에서 애플리케이션을 시작하기 전에 서비스를 올바르게 설정하세요."
+        },
+        {
+          "id": "it-dev-dependency",
+          "difficulty": "intermediate",
+          "term": "dependency",
+          "definition": "의존성, 동작에 필요한 외부 구성 요소",
+          "exampleSentence": "The build failed because a required dependency was missing.",
+          "meaningOfExampleSentence": "필요한 의존성이 없어서 빌드가 실패했습니다."
+        },
+        {
+          "id": "it-dev-latency",
+          "difficulty": "advanced",
+          "term": "latency",
+          "definition": "요청과 응답 사이의 지연 시간",
+          "exampleSentence": "Caching reduced the API latency during peak traffic.",
+          "meaningOfExampleSentence": "캐싱은 트래픽이 몰리는 시간대의 API 지연 시간을 줄였습니다."
+        },
+        {
+          "id": "it-dev-throughput",
+          "difficulty": "advanced",
+          "term": "throughput",
+          "definition": "일정 시간 동안 처리할 수 있는 데이터나 작업의 양",
+          "exampleSentence": "Batch processing increased the system's throughput without adding servers.",
+          "meaningOfExampleSentence": "배치 처리는 서버를 추가하지 않고도 시스템 처리량을 높였습니다."
+        },
+        {
+          "id": "it-dev-deprecated",
+          "difficulty": "advanced",
+          "term": "deprecated",
+          "definition": "더 이상 사용이 권장되지 않는",
+          "exampleSentence": "This method is deprecated and may be removed in a future release.",
+          "meaningOfExampleSentence": "이 메서드는 더 이상 사용이 권장되지 않으며 향후 릴리스에서 제거될 수 있습니다."
+        },
+        {
+          "id": "it-dev-immutable",
+          "difficulty": "advanced",
+          "term": "immutable",
+          "definition": "생성된 뒤 내용을 변경할 수 없는",
+          "exampleSentence": "The configuration object is immutable after the application starts.",
+          "meaningOfExampleSentence": "애플리케이션이 시작된 뒤에는 설정 객체의 내용을 변경할 수 없습니다."
+        },
+        {
+          "id": "it-dev-idempotent",
+          "difficulty": "advanced",
+          "term": "idempotent",
+          "definition": "같은 요청을 반복해도 의도한 결과가 달라지지 않는",
+          "exampleSentence": "The endpoint is idempotent, so retrying the request does not create another resource.",
+          "meaningOfExampleSentence": "이 엔드포인트는 멱등하므로 요청을 다시 보내도 다른 리소스가 생성되지 않습니다."
+        }
+      ]
+    }
+  ]
+}

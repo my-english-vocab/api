@@ -78,6 +78,15 @@ public class AuthController {
         return ResponseEntity.ok(principal);
     }
 
+    @Operation(summary = "내 정보 수정", description = "표시 이름을 수정합니다.")
+    @PatchMapping("/me")
+    public ResponseEntity<ProfileResponse> updateProfile(
+            @AuthenticationPrincipal JwtPrincipal principal,
+            @Valid @RequestBody UpdateProfileRequest request
+    ) {
+        return ResponseEntity.ok(userService.updateProfile(principal.userId(), request));
+    }
+
     @Operation(
             summary = "토큰 재발급",
             description = "httpOnly 쿠키의 Refresh Token으로 새 accessToken을 발급하고, 쿠키의 refresh를 교체합니다(RTR)."
