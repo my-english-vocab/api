@@ -25,6 +25,7 @@ public class OpenApiConfig {
                                 - POST /api/auth/refresh — 쿠키의 refresh token으로 access/refresh token 교체(RTR)
                                 - POST /api/auth/logout — Refresh 쿠키/Redis 무효화
                                 - GET /api/auth/me — 현재 로그인 사용자 조회 (Bearer 인증 필요)
+                                - PATCH /api/auth/me — 표시 이름 수정 (Bearer 인증 필요)
 
                                 ## 인증 방법
                                 1. POST /api/auth/login 응답의 accessToken 값을 복사합니다.

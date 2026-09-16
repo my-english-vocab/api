@@ -398,7 +398,8 @@ rm -f vocabdb.mv.db vocabdb.trace.db
 4. Access 만료 시 `POST /api/auth/refresh` — 쿠키의 refresh로 재발급 (RTR, Set-Cookie로 새 refresh)
 5. `POST /api/auth/logout` — Redis refresh 삭제 + 쿠키 만료
 6. `GET /api/auth/me` — 인증된 사용자 정보 조회
-7. `POST /api/auth/withdraw` — 현재 비밀번호 확인 후 단어·퀴즈 데이터 삭제, 계정 탈퇴 처리와 기존 refresh 무효화
+7. `PATCH /api/auth/me` — 표시 이름 수정
+8. `POST /api/auth/withdraw` — 현재 비밀번호 확인 후 단어·퀴즈 데이터 삭제, 계정 탈퇴 처리와 기존 refresh 무효화
 
 Access Token이 유효하더라도 서버는 인증 요청마다 현재 사용자의 `role`과 `status`를 DB에서 확인합니다. 프런트도 앱 시작 시 `/api/auth/me`로 최신 역할을 동기화합니다.
 

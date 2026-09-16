@@ -79,6 +79,10 @@ public class User {
         this.lastActiveAt = now;
     }
 
+    public void changeDisplayName(String displayName) {
+        this.displayName = displayName;
+    }
+
     public void withdraw(String anonymizedUsername, String disabledPassword, Instant now) {
         this.username = anonymizedUsername;
         this.password = disabledPassword;
