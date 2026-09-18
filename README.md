@@ -1,24 +1,24 @@
 # MyEnglishVocab Server
 
 Spring Boot 기반 영어 단어장 API 서버입니다.  
-JWT Access Token + Redis Refresh Token 인증, 사용자별 단어장 API, AI 예문 생성, 표준 에러 응답을 적용했습니다.
+JWT Access Token + Redis Refresh Token 인증, 사용자별 단어장, 첫 단어장 온보딩, 퀴즈 완료 기록, AI 예문 생성과 관리자 통계 API를 제공합니다.
 
 로컬에서는 Docker Compose로 백엔드·PostgreSQL·Redis를 함께 실행할 수 있습니다. 운영 환경은 FIREBAT 홈서버에서 Spring Boot·PostgreSQL·Redis를 `docker-compose.home.yml`로 실행하고, 별도 Traefik 스택이 HTTPS 요청을 전달합니다.
 
 ## Tech Stack
-- Java 21, Spring Boot 4
+- Java 21, Spring Boot 4.0.7
 - Spring Security + JWT (jjwt)
 - Spring Data Redis (Refresh Token · AI 일일 사용량)
 - Spring Data JPA, H2, PostgreSQL
 - Flyway (DB 스키마 마이그레이션)
 - OpenAI / Gemini (예문·뜻 생성, provider 전환 가능)
 - SpringDoc OpenAPI
-- Spring Boot Actuator (Health Check)
+- Spring Boot Actuator, Micrometer Prometheus (Health Check · Metrics)
 - Docker · Docker Compose (백엔드, Redis, PostgreSQL)
 - GitHub Actions CI/CD (PR/`main` 테스트, GHCR 이미지와 self-hosted runner를 이용한 홈서버 자동 배포)
 - 관리자 역할, 가입·로그인·활동 이력과 운영 통계 API
 
-현재 홈서버 운영 기준은 [`ops/home-server.md`](ops/home-server.md), 관리자 통계의 지표 정의, 최초 관리자 지정, API 목록과 개인정보 경계는 [`ops/admin-statistics.md`](ops/admin-statistics.md)에 정리했습니다.
+현재 홈서버 운영 기준은 [`ops/home-server.md`](ops/home-server.md), 관리자 통계의 지표 정의와 운영 절차는 [`ops/admin-statistics.md`](ops/admin-statistics.md), 첫 단어장 API와 콘텐츠 수정 규칙은 [`docs/onboarding.md`](docs/onboarding.md)에 정리했습니다.
 
 ## 로컬 실행
 
@@ -107,7 +107,7 @@ set +a
 ./gradlew bootRun
 ```
 
-첫 실행 시 Flyway가 PostgreSQL에 `users`, `words`, `flyway_schema_history` 테이블을 생성합니다.
+첫 실행 시 Flyway V1~V5가 PostgreSQL에 `users`, `words`, `quiz_set_attempts`, `user_activity_events`, `account_lifecycle_events`, `flyway_schema_history` 테이블을 생성합니다.
 
 ### 운영 유사 컨테이너 실행
 
@@ -183,7 +183,9 @@ docker compose down -v
 
 로컬용 `docker-compose.yml`은 학습과 통합 실행을 위해 PostgreSQL, Redis, Spring Boot 포트를 호스트에 공개합니다. 홈서버 운영에서는 `docker-compose.home.yml`을 사용합니다. 이전 AWS EC2용 `docker-compose.prod.yml`, Nginx·Certbot 설정과 `ops/deploy-production.sh`는 현재 배포 경로가 아닌 레거시 자료입니다.
 
-### 현재 운영 상태
+### 저장소 기준 운영 구성
+
+아래 구성은 `docker-compose.home.yml`, 배포 Workflow와 기준일이 표시된 [`ops/home-server.md`](ops/home-server.md)를 바탕으로 합니다. 문서만으로 현재 홈서버의 실행 컨테이너·이미지·timer·백업 파일 상태를 증명할 수는 없으므로 운영 판단 전에는 호스트에서 다시 확인해야 합니다.
 
 - 프론트엔드: Vercel (`https://app.myenglishvocab.com`)
 - 백엔드: FIREBAT 홈서버 (`https://api.myenglishvocab.com`)
@@ -258,6 +260,8 @@ docker compose \
 
 ### 백업·모니터링·재부팅 복구
 
+다음 항목은 홈서버 운영 문서에 기록된 구성과 확인 이력입니다. 현재 실행 상태와 최근 성공 시각은 해당 호스트의 systemd timer, 컨테이너와 로그에서 별도로 확인합니다.
+
 - PostgreSQL은 `/home/hyungyu/infra/backup-myenglishvocab-postgres.sh`와 systemd timer로 매일 `18:00 UTC`에 custom-format dump를 만듭니다.
 - 백업은 `/home/hyungyu/backups/myenglishvocab/postgres`에 보관하며 오래된 파일을 자동 정리합니다. 별도 테스트 DB에 `pg_restore`한 복원 검증까지 완료했습니다.
 - Prometheus, Grafana, node-exporter, cAdvisor는 `/home/hyungyu/infra/monitoring`에서 운영합니다. Grafana만 LAN에 `3000`으로 공개하고 나머지는 호스트 포트를 공개하지 않습니다.
@@ -269,7 +273,17 @@ docker compose \
 ./gradlew test --rerun-tasks
 ```
 
-테스트 프로필(`test`)에서는 Redis 대신 인메모리 Refresh Token Store · AI 사용량 Limiter를 사용합니다. `OperationsEndpointTest`는 운영 프로필에서 `/actuator/health`만 공개되고 상세 상태가 숨겨지는지, Spring Security의 기본 사용자가 자동 생성되지 않는지도 검증합니다. JPA의 `open-in-view`는 모든 프로필에서 `false`로 두어 요청 처리 중 영속성 컨텍스트가 불필요하게 유지되지 않도록 했습니다.
+테스트 프로필(`test`)에서는 Redis 대신 인메모리 Refresh Token Store와 AI 사용량 Limiter를 사용합니다. 현재 자동 테스트는 다음 영역을 다룹니다.
+
+- 회원가입·로그인·Refresh Token 교체·로그아웃·표시 이름 수정·회원 탈퇴와 계정 상태 검증
+- 사용자별 단어 CRUD·즐겨찾기·학습 레벨과 AI 생성 실패 처리
+- 첫 단어장 카탈로그 품질, 인증·계정 분리, 선택 저장, 재시도와 동시 완료 요청
+- 퀴즈 세트 완료 기록의 사용자 분리와 `attemptId` 중복 방지
+- 관리자 권한, 활동·가입·탈퇴 통계와 페이지 방문 기록
+- CORS, 운영 필수 환경변수, 외부 AI 연결 제한 시간
+- 운영 프로필의 H2·Swagger 비활성화, `/actuator/health` 상세 정보 비노출과 기본 사용자 미생성
+
+JPA의 `open-in-view`는 모든 프로필에서 `false`로 둡니다. 자동 테스트는 실제 Redis·PostgreSQL, 외부 AI Provider, Docker 이미지, 홈서버 배포·백업·복원과 공개 네트워크를 검증하지 않으므로 해당 계층은 별도로 확인해야 합니다.
 
 ## CORS
 
@@ -294,6 +308,14 @@ CORS_ALLOWED_ORIGINS=https://myenglishvocab.example.com
 ```dotenv
 CORS_ALLOWED_ORIGINS=https://app.example.com,https://www.example.com
 ```
+
+같은 Wi-Fi의 모바일 기기에서 로컬 프론트엔드에 접속한다면 컴퓨터의 LAN IP를 정확한 origin으로 추가합니다. 예를 들어 컴퓨터의 IP가 `192.168.0.10`이면 다음과 같이 설정합니다.
+
+```dotenv
+CORS_ALLOWED_ORIGINS=http://localhost:3000,http://192.168.0.10:3000
+```
+
+Docker Compose 통합 실행은 저장소 루트의 `.env`를 읽으므로 값을 변경한 뒤 `app` 컨테이너를 재생성해야 합니다. 프론트엔드도 API 주소와 Next.js 개발 origin을 같은 LAN IP 기준으로 설정해야 합니다.
 
 `*`로 모든 origin을 허용하지 않습니다. 이 서버는 refresh token 쿠키를 사용하므로, 허용할 프론트 주소를 명시해야 합니다.
 
@@ -420,6 +442,20 @@ Swagger의 HTTP Bearer 보안 방식은 `Authorization: Bearer {accessToken}` �
 | Access Token (JWT) | 30분 | 클라이언트 메모리 | API 인증 (Bearer) |
 | Refresh Token (UUID) | 7일 | Redis + **httpOnly 쿠키** | Access 재발급 / 로그아웃 |
 
+## 첫 단어장 온보딩 API
+
+모든 온보딩 API는 JWT 인증이 필요합니다. 서버가 관리하는 카탈로그의 ID만 클라이언트에서 받고, 뜻·예문·해석 원본은 서버 카탈로그에서 가져옵니다.
+
+| Method | Path | 설명 |
+|---|---|---|
+| `GET` | `/api/onboarding/status` | 현재 계정의 단어가 0개인지 확인 |
+| `GET` | `/api/onboarding/catalog` | 카탈로그 버전과 목적별 추천 단어 조회 |
+| `POST` | `/api/onboarding/complete` | 선택한 추천 단어를 한 트랜잭션으로 저장 |
+
+현재 카탈로그는 버전 3이며 7개 학습 목적마다 초급 2개·중급 3개·고급 5개, 총 70개 단어를 제공합니다. 같은 계정의 동시 완료 요청은 계정 행 잠금으로 직렬화하고, 기존 단어와 앞뒤 공백·대소문자를 무시해 중복되는 항목은 건너뜁니다. 완료 여부나 사용자의 테스트 답변은 별도로 저장하지 않습니다.
+
+카탈로그 수정, 버전 관리, 검증 범위는 [`docs/onboarding.md`](docs/onboarding.md)를 참고합니다.
+
 ## 단어장 API
 
 모든 Word API는 **JWT 인증 필수**입니다. URL에 userId를 넣지 않으며, JWT의 `userId`로 본인 단어만 접근합니다.
@@ -460,13 +496,35 @@ curl -X PATCH http://localhost:8080/api/words/{id}/favorite \
 ```
 
 ### 퀴즈와의 역할 분리
-- **서버**: 단어 목록 제공, `mark-learned`로 level 증가
-- **프론트**: 랜덤/순서대로 보여주기, 뜻 보기/넘기기 UI
+- **서버**: 단어 목록 제공, `mark-learned`로 level 증가, 세트 완료 이력과 완료 횟수 저장
+- **프론트**: 등록 순서 기반 세트 구성, 세트 안의 무작위 출제, 뜻 보기와 결과 UI
+
+## 퀴즈 세트 API
+
+퀴즈 문제 구성과 출제 순서는 프론트엔드가 담당하고, 서버는 인증 사용자별 완료 기록을 저장합니다.
+
+| Method | Path | 설명 |
+|---|---|---|
+| `GET` | `/api/quiz/sets/attempts` | 세트별 완료 횟수와 마지막 완료 시각 조회 |
+| `POST` | `/api/quiz/sets/{setNumber}/attempts` | 마지막 문제까지 완료한 세트 기록 |
+
+완료 요청은 UUID 형식의 `attemptId`를 받습니다. 같은 사용자가 동일한 `attemptId`를 다시 보내도 중복 집계하지 않으며, 다른 사용자의 기록과 분리합니다.
+
+## 활동 기록과 관리자 API
+
+| Method | Path | 설명 |
+|---|---|---|
+| `POST` | `/api/analytics/page-views` | 인증 사용자의 pathname 기록. 쿼리 문자열은 허용하지 않음 |
+| `GET` | `/api/admin/statistics/**` | `ADMIN` 전용 서비스·사용자·활동 통계 조회 |
+
+활동 이벤트에는 로그인, 페이지 방문, 단어 생성, AI 요청, 퀴즈 세트 완료가 포함됩니다. 관리자 지표 정의, 최초 관리자 지정과 개인정보 경계는 [`ops/admin-statistics.md`](ops/admin-statistics.md)를 참고합니다.
 
 ## AI 예문 생성
 
 `POST /api/words/generate-example`은 JWT 인증이 필요합니다.  
 결과는 DB에 저장되지 않으므로, 확인 후 `POST /api/words`로 저장하세요.
+
+`GET /api/ai/usage`는 현재 계정의 일일 한도, 사용 횟수와 남은 횟수를 반환합니다.
 
 ### 동작
 1. `term` 필수, `definition` 선택
@@ -556,6 +614,8 @@ src/main/resources/db/migration/
   V3__add_favorite_to_words.sql
   V4__create_quiz_set_attempts.sql
   V5__add_admin_and_analytics.sql
+src/main/resources/onboarding/catalog.json # 버전 관리되는 추천 단어 원본
+docs/onboarding.md             # 첫 단어장 API·콘텐츠 관리
 user/
   controller/AuthController
   service/UserService
@@ -568,6 +628,14 @@ admin/
 analytics/
   controller/AnalyticsController
   service/ActivityService
+onboarding/
+  OnboardingController
+  OnboardingService
+  OnboardingCatalog
+quiz/
+  controller/QuizSetAttemptController
+  service/QuizSetAttemptService
+  entity/QuizSetAttempt
 word/
   controller/WordController
   service/WordService
